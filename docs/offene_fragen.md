@@ -9,16 +9,18 @@ Format: `[Status] Frage — Adressat — Datum erstellt`. Status ∈ {OFFEN, GEK
 - [OFFEN] In welchem Schema werden unsere Tabellen `T_VAT_STATEMENT` und `T_VAT_STATEMENT_ITEM` angelegt? `dbo` ist gesperrt, aber kein eigenes Schema für Tabellen erwähnt — gehen die ans `dbo`-Architekt-Schema? — Architekt (Peter Lehmann)
 - [OFFEN] Wie ist der konkrete Prozess zur Anlage von Tabellen / T_CODE-Einträgen? Skript per Mail an den Architekt? Pull-Request? — Architekt
 - [OFFEN] Brauchen wir `ins_views` / `upd_views` für jeden Schreibvorgang aus dem Frontend, oder darf `ERP_REMOTE_USER` direkt auf Tabellen schreiben? — Architekt
-- [OFFEN] Wo finden wir das Dokument mit den HdM-Namenskonventionen? — User reicht nach in `docs/namenskonventionen/`
-- [OFFEN] SQL-Dump der Dev-DB (ERPDEV26S-Snapshot) — User reicht nach in `sql/99_devdb_kopie/`
+- [GEKLÄRT 2026-06-03] HdM-Namenskonventionen liegen in `docs/namenskonventionen/Lerneinheit_7_Datenbankentwicklung.docx` (+ Zusammenfassung in `INDEX.md`). SQL-Skelette entsprechend refactored (ADR-007).
+- [GEKLÄRT 2026-06-03] Dev-DB-Snapshot liegt in `sql/99_devdb_kopie/cre_devdb_11.05.2026.utf8.sql`. Wichtigste Befunde: `T_INVOICE`/`T_SUPPLIER_INVOICE` haben aktuell KEINE `TAX_AMOUNT`-Spalte; `T_CODE.ID_CODE` ist KEIN IDENTITY; `T_CODE_NEXT` hat `SECURITY_LEVEL`-Spalte für Rollencheck.
 
 ## Schnittstellen zu anderen Gruppen
 
-- [OFFEN] Gruppe 4 (Eingangsrechnungen): Wann ergänzt sie `TAX_AMOUNT` in `T_SUPPLIER_INVOICE`? Wie wird Korrekturlogik dort abgebildet?
-- [OFFEN] Gruppe 7 (Ausgangsrechnungen): Wann ergänzt sie `TAX_AMOUNT`, `IS_CORRECTION`, `ORIGINAL_INVOICE_ID` in `T_INVOICE`? Form der Korrekturzeile?
-- [OFFEN] Gruppe 8 (Zahlungen / Skonto): Liefern sie Skonto als eigene Korrektur-Rechnung, oder mutieren sie die Ursprungsrechnung?
-- [OFFEN] Gruppen 9/10 (Barrechnung Freiburg/Rosenberg): Liefern Daten direkt in `T_INVOICE` oder eigene Tabellen?
-- [OFFEN] Gruppe 19 (FiBu) ist unbesetzt — bestätigen, dass wir nur theoretisch ausgeben und keinen abnehmenden Konsumenten haben
+Stand laut User: Werte und Inhalt sind geklärt, **konkrete Spaltennamen** der anderen Gruppen stehen noch aus. Sobald die kommen, müssen `list_views.V_LIST_OUTPUT_VAT` und `list_views.V_LIST_INPUT_VAT` angepasst werden — der Rest der Pipeline (sp_create_vat_statement, fn_*) bleibt unverändert.
+
+- [OFFEN] Gruppe 4 (Eingangsrechnungen): Exakte Spaltennamen für `TAX_AMOUNT` auf `T_SUPPLIER_INVOICE` (oder bleibt es bei Item-Aggregation aus `T_SUPPLIER_INVOICE_ITEM.UNIT_VAT_PCT`)?
+- [OFFEN] Gruppe 7 (Ausgangsrechnungen): Exakte Spaltennamen für `TAX_AMOUNT`, `IS_CORRECTION`, `ORIGINAL_INVOICE_ID` auf `T_INVOICE`?
+- [OFFEN] Gruppe 8 (Zahlungen / Skonto): Skonto als eigene Korrektur-Rechnung oder Mutation der Ursprungsrechnung?
+- [OFFEN] Gruppen 9/10 (Barrechnung Freiburg/Rosenberg): Eigene Tabelle oder Eintrag in `T_INVOICE`?
+- [OFFEN] Gruppe 19 (FiBu) ist unbesetzt — bestätigen, dass wir nur theoretisch ausgeben und keinen abnehmenden Konsumenten haben.
 
 ## Fachlich
 

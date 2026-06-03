@@ -2,7 +2,7 @@
 
 Strukturiert nach Komponente. Jeder Testfall hat: Vorbedingung, Input, Erwartet, Tatsächlich, Status (✅/❌/⏳).
 
-## SF_CK_VAT_PERIOD
+## fn_check_vat_period
 
 Quelle: MS4 Tabelle „Tests SF_CK_PERIOD" + ADR-004.
 
@@ -15,7 +15,7 @@ Quelle: MS4 Tabelle „Tests SF_CK_PERIOD" + ADR-004.
 | TC-CKP-05 | Bereits als DRAFT angelegt — Reset erlaubt | Existiert mit Status `DRAFT` | Return `0` | ⏳ |
 | TC-CKP-06 | Ungültiges Periodenformat | `VAT_PERIOD='2026-13'` | Return `1` (kein gültiger Monat) | ⏳ |
 
-## SF_CAL_VAT
+## fn_calculate_vat_balance
 
 Quelle: MS4 Tabelle „Tests SF_CAL_VAT" + ADR-004 (Konvention Absolutbetrag).
 
@@ -28,7 +28,7 @@ Quelle: MS4 Tabelle „Tests SF_CAL_VAT" + ADR-004 (Konvention Absolutbetrag).
 | TC-CAL-05 | Ausgeglichen | 100 | 100 | 0 / `NEUTRAL` | ⏳ |
 | TC-CAL-06 | Beide null | 0 | 0 | 0 / `NEUTRAL` | ⏳ |
 
-## SP_CREATE_VAT_STATEMENT
+## sp_create_vat_statement
 
 | ID | Testfall | Setup | Erwartet | Status |
 |---|---|---|---|---|
@@ -41,7 +41,7 @@ Quelle: MS4 Tabelle „Tests SF_CAL_VAT" + ADR-004 (Konvention Absolutbetrag).
 | TC-SP-07 | Item außerhalb des Monats wird nicht aufgenommen | T_INVOICE-Zeile vom 31.12.2025, Periode 2026-01 | Item taucht NICHT auf | ⏳ |
 | TC-SP-08 | Späte Korrektur fließt in nächste offene Periode | Korrektur mit Datum 2026-02-15 bezogen auf Rechnung 2026-01 | Item landet in 2026-02, nicht in 2026-01 | ⏳ (Logik dafür muss noch in SP eingebaut werden) |
 
-## Status-Workflow (folgen, wenn SP_APPROVE, SP_PAY, SP_REJECT existieren)
+## Status-Workflow (sp_approve_vat_statement / sp_pay_vat_statement / sp_reject_vat_statement)
 
 | ID | Testfall | Status |
 |---|---|---|

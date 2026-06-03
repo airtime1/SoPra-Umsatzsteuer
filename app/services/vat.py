@@ -1,8 +1,9 @@
 """
 Duenne Service-Schicht zwischen Streamlit und Datenbank.
 
-Alle fachliche Logik liegt in Stored Procs / Functions. Diese Modul-Funktionen sind
-nur Aufruf-Wrapper, die SQL-Statements verstecken.
+Alle fachliche Logik liegt in Stored Procs / Functions (HdM-konform
+benamst: sp_*, fn_*, klein-snake_case). Diese Modul-Funktionen sind
+nur Aufruf-Wrapper.
 """
 
 from __future__ import annotations
@@ -31,8 +32,8 @@ class VatStatement:
 
 
 def list_statements() -> pd.DataFrame:
-    """Alle Abrechnungen aus list_views.VAT_STATEMENT_OVERVIEW
-    (View muss noch angelegt werden, fuer jetzt direkt aus T_VAT_STATEMENT)."""
+    """Alle Abrechnungen — direkt aus dbo.T_VAT_STATEMENT, bis es eine
+    list_views.V_LIST_VAT_STATEMENT gibt."""
     sql = """
         SELECT VAT_STATEMENT_ID, VAT_PERIOD, VAT_STATUS,
                OUTPUT_VAT_TOTAL, INPUT_VAT_TOTAL,
@@ -48,7 +49,6 @@ def list_statements() -> pd.DataFrame:
 
 
 def get_statement_items(statement_id: int) -> pd.DataFrame:
-    """Einzelne Steuerfaelle einer Abrechnung."""
     sql = """
         SELECT VAT_STATEMENT_ITEM_ID, SOURCE_TABLE, SOURCE_INVOICE_ID,
                SOURCE_INVOICE_DATE, TAX_AMOUNT,
@@ -63,11 +63,11 @@ def get_statement_items(statement_id: int) -> pd.DataFrame:
 
 
 def create_statement(period: str, created_by: str) -> int:
-    """Ruft stored_proc.SP_CREATE_VAT_STATEMENT auf. Gibt die neue ID zurueck."""
+    """Ruft stored_proc.sp_create_vat_statement auf. Gibt die neue ID zurueck."""
     with get_app_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.SP_CREATE_VAT_STATEMENT @VAT_PERIOD = ?, @CREATED_BY = ?",
+            "EXEC stored_proc.sp_create_vat_statement @vat_period = ?, @created_by = ?",
             period,
             created_by,
         )
@@ -77,17 +77,36 @@ def create_statement(period: str, created_by: str) -> int:
 
 
 def approve_statement(statement_id: int, approved_by: str) -> None:
-    """DRAFT -> APPROVED. Stored Proc dafuer ist noch zu bauen (sql/04_stored_proc/)."""
-    raise NotImplementedError(
-        "SP_APPROVE_VAT_STATEMENT noch nicht angelegt — siehe docs/offene_fragen.md"
-    )
+    """DRAFT -> APPROVED via stored_proc.sp_approve_vat_statement."""
+    with get_app_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "EXEC stored_proc.sp_approve_vat_statement @statement_id = ?, @approved_by = ?",
+            statement_id,
+            approved_by,
+        )
+        conn.commit()
 
 
 def reject_statement(statement_id: int, rejected_by: str) -> None:
-    """APPROVED -> DRAFT."""
-    raise NotImplementedError("SP_REJECT_VAT_STATEMENT noch nicht angelegt")
+    """APPROVED -> DRAFT via stored_proc.sp_reject_vat_statement."""
+    with get_app_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "EXEC stored_proc.sp_reject_vat_statement @statement_id = ?, @rejected_by = ?",
+            statement_id,
+            rejected_by,
+        )
+        conn.commit()
 
 
 def pay_statement(statement_id: int, paid_by: str) -> None:
-    """APPROVED -> PAID."""
-    raise NotImplementedError("SP_PAY_VAT_STATEMENT noch nicht angelegt")
+    """APPROVED -> PAID via stored_proc.sp_pay_vat_statement."""
+    with get_app_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "EXEC stored_proc.sp_pay_vat_statement @statement_id = ?, @paid_by = ?",
+            statement_id,
+            paid_by,
+        )
+        conn.commit()

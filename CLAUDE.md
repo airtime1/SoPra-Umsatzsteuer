@@ -113,15 +113,32 @@ SoPra-Umsatzsteuer/
 
 Siehe `docs/entscheidungen/` für vollständige ADRs.
 
-| Thema | Entscheidung |
+| Thema | Entscheidung | ADR |
+|---|---|---|
+| Status-Modell | 3 Status englisch: `DRAFT` → `APPROVED` → `PAID` (+ Rückgabe `APPROVED` → `DRAFT`) | 001 |
+| Rollen | Stufe 1 Sachbearbeiter (anlegen), Stufe 2 Leitung FiBu (auszahlen), Stufe 3 CFO (freigeben) | 002 |
+| Statusspalte | `VAT_STATUS` (nicht `STATUS`) | 003 |
+| Belegdatum-Spalte | `SOURCE_INVOICE_DATE` (nicht `INVOICE_DATE`) | 003 |
+| Saldo-Speicherung | `VAT_BALANCE` als Absolutbetrag (≥0), `VAT_TYPE` ∈ {`ZAHLLAST`, `UEBERHANG`, `NEUTRAL`} | 004 |
+| Korrekturen | Eigene Zeile in `T_VAT_STATEMENT_ITEM` mit `IS_CORRECTION=1`, `ORIGINAL_INVOICE_ID` zeigt auf Ursprung, negativer `TAX_AMOUNT` | 005 |
+| Frontend-Stack | Python + Streamlit + pyodbc, Option auf phpRunner-Wechsel offen | 006 |
+| Naming | HdM-Konvention strikt: `sp_`/`fn_` klein, `V_LIST_`/`LOV_`/`V_INS_`/`V_UPD_` für Views, Tabellen + Tabellenspalten UPPER_CASE, Parameter klein (`@vat_period`) | 007 |
+
+## HdM-Namen unserer Objekte (siehe docs/namenskonventionen/)
+
+| Objekt | Voller Name |
 |---|---|
-| Status-Modell | 3 Status englisch: `DRAFT` → `APPROVED` → `PAID` (+ Rückgabe `APPROVED` → `DRAFT`) |
-| Rollen | Stufe 1 Sachbearbeiter (anlegen), Stufe 2 CFO (freigeben), Stufe 3 Leitung FiBu (auszahlen) |
-| Statusspalte | `VAT_STATUS` (nicht `STATUS`) |
-| Belegdatum-Spalte | `SOURCE_INVOICE_DATE` (nicht `INVOICE_DATE`) |
-| Saldo-Speicherung | `VAT_BALANCE` als Absolutbetrag (≥0), `VAT_TYPE` ∈ {`ZAHLLAST`, `UEBERHANG`, `NEUTRAL`} |
-| Korrekturen | Eigene Zeile in `T_VAT_STATEMENT_ITEM` mit `IS_CORRECTION=1`, `ORIGINAL_INVOICE_ID` zeigt auf Ursprung, negativer `TAX_AMOUNT` |
-| Frontend-Stack | Python + Streamlit + pyodbc, Option auf phpRunner-Wechsel offen |
+| Kopftabelle | `dbo.T_VAT_STATEMENT` |
+| Detailtabelle | `dbo.T_VAT_STATEMENT_ITEM` |
+| Werteliste Status | `list_views.LOV_VAT_STATUS` |
+| Liste USt | `list_views.V_LIST_OUTPUT_VAT` |
+| Liste VSt | `list_views.V_LIST_INPUT_VAT` |
+| Periodencheck | `stored_func.fn_check_vat_period` |
+| Saldoberechnung | `stored_func.fn_calculate_vat_balance` |
+| Anlegen / Neu berechnen | `stored_proc.sp_create_vat_statement` |
+| Freigeben (DRAFT → APPROVED) | `stored_proc.sp_approve_vat_statement` |
+| Auszahlen (APPROVED → PAID) | `stored_proc.sp_pay_vat_statement` |
+| Zurückweisen (APPROVED → DRAFT) | `stored_proc.sp_reject_vat_statement` |
 
 ## Wenn Claude unsicher ist…
 

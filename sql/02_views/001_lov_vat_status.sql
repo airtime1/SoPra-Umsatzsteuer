@@ -1,15 +1,14 @@
 -- ============================================================
 -- list_views.LOV_VAT_STATUS
--- List-of-Values fuer Status-Dropdown im Frontend.
+-- Werteliste der Status fuer Umsatzsteuerabrechnung.
+-- Verwendung im Frontend (z.B. Status-Dropdown).
 -- ============================================================
+-- Vorbild: dbo.LOV_STATUS_ORDER (Dev-DB)
 
 CREATE OR ALTER VIEW list_views.LOV_VAT_STATUS
-(
-    CODE_ID,
-    VAT_STATUS
-) AS
+AS
 SELECT
-    ID_CODE      AS CODE_ID,
-    CODE_NAME    AS VAT_STATUS
+    ID_CODE     AS CODE_ID,
+    CODE_NAME   AS VAT_STATUS
 FROM dbo.T_CODE
 WHERE CODE_TYPE = 'VAT_STATUS';

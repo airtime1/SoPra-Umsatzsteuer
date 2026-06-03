@@ -12,11 +12,21 @@ Reihenfolge der Ausführung beim Aufbau einer leeren Sandbox:
 
 `99_devdb_kopie/` enthält die Referenz-DB-Kopie, die wir von der HdM bekommen — nicht selbst pflegen, nur als Lookup.
 
-## Namenskonventionen (eigene Festlegungen, ergänzend zur HdM-Vorgabe in `docs/namenskonventionen/`)
+## Namenskonventionen
 
-- Tabellen: `T_<MODUL>_<NAME>` (z. B. `T_VAT_STATEMENT`)
-- Views: `<SCHEMA>.<KATEGORIE>_<MODUL>_<NAME>` (z. B. `list_views.OUTPUT_VAT_TOTAL`)
-- Stored Functions: `stored_func.SF_<VERB>_<NAME>` (z. B. `SF_CK_VAT_PERIOD`)
-- Stored Procedures: `stored_proc.SP_<VERB>_<NAME>` (z. B. `SP_CREATE_VAT_STATEMENT`)
-- Spalten: `SNAKE_CASE`, sprechende englische Namen
-- Constraints: `<TYP>_<TABELLE>_<SPALTE>` (z. B. `CHK_VAT_STATEMENT_STATUS`, `FK_VAT_ITEM_STATEMENT`)
+**Verbindlich: HdM-Vorgabe** (siehe `docs/namenskonventionen/INDEX.md` und `Lerneinheit_7_Datenbankentwicklung.docx`).
+
+Kurz-Cheatsheet:
+
+| Objekt | Pattern | Beispiel |
+|---|---|---|
+| Tabelle | `dbo.T_<NAME>` UPPER | `dbo.T_VAT_STATEMENT` |
+| Tabellen-Spalte | UPPER_SNAKE | `VAT_STATUS`, `SOURCE_INVOICE_DATE` |
+| LOV-View | `list_views.LOV_<NAME>` | `list_views.LOV_VAT_STATUS` |
+| List-View | `list_views.V_LIST_<NAME>` | `list_views.V_LIST_OUTPUT_VAT` |
+| Insert-View | `ins_views.V_INS_<NAME>` | (bei Bedarf) |
+| Update-View | `upd_views.V_UPD_<NAME>` | (bei Bedarf) |
+| Stored Function | `stored_func.fn_<purpose>_<entity>` klein | `stored_func.fn_calculate_vat_balance` |
+| Stored Procedure | `stored_proc.sp_<action>_<entity>` klein | `stored_proc.sp_create_vat_statement` |
+| Parameter | `@<name>` klein, snake_case | `@vat_period`, `@created_by` |
+| Constraints | `CHK_`/`FK_`/`PK_/UQ_` + Tabelle + Spalte UPPER | `CHK_VAT_STATEMENT_STATUS` |

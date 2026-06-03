@@ -1,29 +1,23 @@
 -- ============================================================
 -- 001_t_code_vat_status.sql
--- Stammdaten-Einträge für Umsatzsteuerabrechnung-Status.
+-- Stammdaten-Einträge fuer Umsatzsteuerabrechnung-Status.
 -- Zielschema: dbo (gesperrt) — Skript an Architekt liefern.
 -- ============================================================
--- Hinweis: ID_CODE-Werte sind Beispielwerte aus MS4. Tatsächliche
--- IDs vom Architekt vergeben lassen.
+-- Hinweis: dbo.T_CODE.ID_CODE ist KEIN IDENTITY (Dev-DB-Kopie geprueft).
+-- IDs muessen explizit vergeben werden; konkrete Werte vom Architekt
+-- bekommen. Hier 9001..9003 als Platzhalter (ausreichend weit weg
+-- von vorhandenen Bereichen).
 
--- DRAFT, APPROVED, PAID in T_CODE
-INSERT INTO dbo.T_CODE (CODE_TYPE, CODE_NAME) VALUES
-    ('VAT_STATUS', 'DRAFT'),
-    ('VAT_STATUS', 'APPROVED'),
-    ('VAT_STATUS', 'PAID');
+INSERT INTO dbo.T_CODE (ID_CODE, CODE_TYPE, CODE_NAME) VALUES
+    (9001, 'VAT_STATUS', 'DRAFT'),
+    (9002, 'VAT_STATUS', 'APPROVED'),
+    (9003, 'VAT_STATUS', 'PAID');
 
--- Erlaubte Statusübergänge in T_CODE_NEXT
--- (ID_CODE-Werte aus dem vorherigen INSERT übernehmen)
--- DRAFT -> APPROVED         (CFO gibt frei)
--- APPROVED -> PAID          (Leitung FiBu zahlt aus)
--- APPROVED -> DRAFT         (CFO weist zurück)
-INSERT INTO dbo.T_CODE_NEXT (ID_CODE, CODE_NEXT_ID)
-SELECT
-    src.ID_CODE,
-    dst.ID_CODE
-FROM dbo.T_CODE src
-JOIN dbo.T_CODE dst
-    ON src.CODE_TYPE = 'VAT_STATUS' AND dst.CODE_TYPE = 'VAT_STATUS'
-WHERE (src.CODE_NAME = 'DRAFT'    AND dst.CODE_NAME = 'APPROVED')
-   OR (src.CODE_NAME = 'APPROVED' AND dst.CODE_NAME = 'PAID')
-   OR (src.CODE_NAME = 'APPROVED' AND dst.CODE_NAME = 'DRAFT');
+-- Erlaubte Statusuebergaenge in dbo.T_CODE_NEXT
+-- Spalten: CODE_TYPE, CODE_ID, CODE_NEXT_ID, SECURITY_LEVEL
+-- SECURITY_LEVEL entspricht der Rolle, die den Wechsel ausloesen darf
+-- (siehe ADR-002: 3 = CFO, 2 = Leitung FiBu).
+INSERT INTO dbo.T_CODE_NEXT (CODE_TYPE, CODE_ID, CODE_NEXT_ID, SECURITY_LEVEL) VALUES
+    ('VAT_STATUS', 9001, 9002, 3),  -- DRAFT     -> APPROVED  durch CFO
+    ('VAT_STATUS', 9002, 9003, 2),  -- APPROVED  -> PAID       durch Leitung FiBu
+    ('VAT_STATUS', 9002, 9001, 3);  -- APPROVED  -> DRAFT      Rueckgabe durch CFO

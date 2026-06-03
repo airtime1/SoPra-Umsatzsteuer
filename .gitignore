@@ -34,10 +34,12 @@ dist/
 *.log
 logs/
 
-# DB-Dumps mit Echtdaten (nur explizit committen, was anonymisiert ist)
+# DB-Dumps der HdM (lokal vorhalten, nicht committen)
 sql/99_devdb_kopie/*.bak
 sql/99_devdb_kopie/*.dump
+sql/99_devdb_kopie/*.sql
 sql/99_devdb_kopie/data/
+!sql/99_devdb_kopie/README.md
 
 # Lokale Test-Artefakte
 tests/output/

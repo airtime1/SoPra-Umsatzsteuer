@@ -15,6 +15,8 @@ Beim Übergang vom Fach- ins Systemkonzept sind mehrere Konflikte und Unklarheit
 ## Weitere kleinere Diskrepanzen
 
 - MS4 nennt im Überblick (2.1) ein Schema `lov_views`, im LOV-CREATE-Statement aber `lov_views.LOV_VAT_STATUS`. Tatsächlich verfügbares Schema laut HdM: `list_views`. → **`list_views.LOV_VAT_STATUS`**.
-- MS4 erwähnt nicht explizit `ins_views` / `upd_views` für Frontend-Schreibzugriff. Da `ERP_REMOTE_USER` nur read/write/execute hat, brauchen wir vermutlich Wrapper-Views. → in `sql/05_ins_upd_views/` skizziert, mit Team klären.
-- View-Namen im MS4: `OUTPUT_VAT_TOTAL` (Singular) vs. "OUTPUT_VAT_TOTALT" (Tippfehler im Übersicht-Abschnitt). → **`OUTPUT_VAT_TOTAL`**.
+- MS4 erwähnt nicht explizit `ins_views` / `upd_views` für Frontend-Schreibzugriff. Da `ERP_REMOTE_USER` nur read/write/execute hat, brauchen wir vermutlich Wrapper-Views. → Stand jetzt über Stored Procs gelöst (`sp_create_vat_statement`, `sp_approve_*`, `sp_pay_*`, `sp_reject_*`), Insert/Update-Views aktuell nicht nötig.
+- View-Namen im MS4: `OUTPUT_VAT_TOTAL` (Singular) vs. "OUTPUT_VAT_TOTALT" (Tippfehler). → mit HdM-Konventionen umbenannt zu `V_LIST_OUTPUT_VAT` (ADR-007).
 - MS4 referenziert `T_INOVICE` an einer Stelle (Tippfehler) — gemeint ist `T_INVOICE`.
+- **MS4 vs. tatsächliche Dev-DB:** MS4 nimmt an, dass `T_INVOICE` und `T_SUPPLIER_INVOICE` jeweils eine `TAX_AMOUNT`-Spalte auf der Kopf-Ebene haben. Dev-DB-Snapshot vom 11.05.2026 zeigt: Spalte existiert NICHT, Steuer liegt nur auf Item-Ebene (`T_SUPPLIER_INVOICE_ITEM.UNIT_VAT_PCT`) oder ist noch zu ergänzen. → Views in `sql/02_views/` mit klarem TODO; werden angepasst, sobald Gruppen 4/7 die finalen Spalten liefern.
+- **Stored Procedure / Function Naming:** MS4 verwendet UPPER_CASE (`SF_CK_VAT_PERIOD`, `SP_CREATE_VAT_STATEMENT`). HdM-Konvention ist KLEIN. → ADR-007, alle Namen refactored.
