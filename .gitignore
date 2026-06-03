@@ -1,0 +1,44 @@
+# Secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Build / Logs
+build/
+dist/
+*.log
+logs/
+
+# DB-Dumps mit Echtdaten (nur explizit committen, was anonymisiert ist)
+sql/99_devdb_kopie/*.bak
+sql/99_devdb_kopie/*.dump
+sql/99_devdb_kopie/data/
+
+# Lokale Test-Artefakte
+tests/output/
+*.tmp
