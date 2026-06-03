@@ -33,3 +33,9 @@ Stand laut User: Werte und Inhalt sind geklärt, **konkrete Spaltennamen** der a
 - [OFFEN] Finale Frontend-Entscheidung: Python (vorläufig) vs. phpRunner — Stichtag für Wechsel-Option?
 - [OFFEN] Repo-Host: GitHub privat, HdM-Gitlab, oder lokal?
 - [OFFEN] Aufgabenteilung MS5: Wer baut welchen Teil (SQL / Frontend / Tests / Doku)?
+
+## Organisatorisch / Abgabe
+
+- [OFFEN] Abgabeform Implementierungsphase: deployen wir die DB-Artefakte direkt auf `ERPDEV26S` (dann ist das die "Abgabe")? Wo wird das Test-/Abnahmekonzept eingereicht? Gibt es einen Phase-5-Aufgabentext auf Moodle? — beim nächsten Coaching/Treffen klären
+- [OFFEN] Präsentationstermin Phase 5 (Implementierung + Test/Abnahmekonzept) — Datum und Dauer?
+- [OFFEN] Aufwände eintragen in den "Dev-Tools" — wer im Team trägt für welche Phase ein?
