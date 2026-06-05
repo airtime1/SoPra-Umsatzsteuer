@@ -2,7 +2,7 @@
 
 Konzern-ERP-Modul für die monatliche Umsatzsteuerabrechnung. Liest Ein- und Ausgangsrechnungen aus vorgelagerten Modulen, aggregiert je Periode, berechnet Zahllast/Überhang, erzeugt einen revisionssicheren Abrechnungsbeleg.
 
-Kontext, Architektur und Konventionen: siehe [`CLAUDE.md`](CLAUDE.md).
+**Briefing:** [`CLAUDE.md`](CLAUDE.md) · **Mitarbeiten:** [`CONTRIBUTING.md`](CONTRIBUTING.md) · **Entscheidungen:** [`docs/entscheidungen/`](docs/entscheidungen/) · **Offene Fragen:** [GitHub Issues](../../issues)
 
 ## Team
 
@@ -71,6 +71,25 @@ streamlit run app\main.py
 | `app/` | Streamlit-Frontend |
 | `tests/` | Test- und Abnahmekonzept (MS5) |
 | `scripts/` | Deploy-Helfer |
+
+## Workflow (kurz)
+
+Komplette Konventionen in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+```bash
+# Feature angehen
+git checkout main && git pull
+git checkout -b feat/<kurz-beschreibung>
+
+# arbeiten, oft committen mit Conventional Commits
+git commit -m "feat(stored-proc): sp_pay_vat_statement"
+
+# pushen, PR auf GitHub aufmachen
+git push -u origin feat/<kurz-beschreibung>
+gh pr create   # oder: GitHub-UI
+```
+
+Niemals direkt auf `main` pushen. Mindestens 1 Review, dann Squash-Merge.
 
 ## Deadlines
 

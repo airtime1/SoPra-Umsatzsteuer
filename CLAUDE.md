@@ -1,6 +1,8 @@
 # Projekt-Kontext für Claude — SoPra Umsatzsteuerabrechnung
 
-> Briefing-Datei für Claude. Wenn sich Tech-Stack, Team oder Konventionen ändern, hier zuerst pflegen.
+> Briefing-Datei für Claude (und andere KI-Agents). Wird automatisch geladen, wenn Claude in diesem Verzeichnis arbeitet. Wenn sich Tech-Stack, Team oder Konventionen ändern, hier zuerst pflegen — alle Agents lesen es beim Start.
+
+> **Dies ist ein Team-Repo auf GitHub.** Vor jeder Codeänderung bitte einmal `CONTRIBUTING.md` lesen (Branch-/Commit-/PR-Konventionen). Niemals direkt auf `main` pushen, keine Force-Pushes, keine Credentials committen.
 
 ## Wer arbeitet hier woran
 
@@ -158,6 +160,25 @@ Siehe `docs/entscheidungen/` für vollständige ADRs.
 - Niemals direkt auf `ERPDEV26S` deployen ohne Bestätigung (Bypass-Tests gehen erst auf Sandbox)
 - Niemals `dbo`-Objekte verändern (geht ohnehin nicht mit unseren Rechten, aber: Skripte als "an Architekt liefern" kennzeichnen)
 - Niemals Inhalt von Schnittstellen-Tabellen (`T_INVOICE`, `T_SUPPLIER_INVOICE`) löschen oder umbauen — wir lesen nur
+- Niemals direkt auf `main` pushen oder Force-Push verwenden — immer Feature-Branch + PR
+- Niemals einen PR ohne menschliches Review mergen
+
+## Team-Workflow (kurz, Details in CONTRIBUTING.md)
+
+1. **Feature-Branches**: `feat/`, `fix/`, `refactor/`, `docs/`, `test/`, `chore/` + Kurzbeschreibung
+2. **Commit-Messages**: Conventional Commits — `feat(stored-proc): sp_pay_vat_statement APPROVED→PAID`
+3. **Pull Requests**: Template ausfüllen, mind. 1 Reviewer, Squash-Merge
+4. **Issues**: offene Fragen, Bugs, Tasks und Schnittstellen-Klärungen werden als Issues geführt — siehe Templates unter `.github/ISSUE_TEMPLATE/`
+5. **ADRs vor großen Architekturentscheidungen**: neue Datei in `docs/entscheidungen/`, dann Code
+
+## Wenn du als Agent in diesem Repo arbeitest
+
+- **Erst lesen**: diese Datei + `CONTRIBUTING.md` + relevante ADRs in `docs/entscheidungen/`
+- **Branch anlegen** vor jeder inhaltlichen Änderung
+- **Kleine commits**, logisch zusammengehörig
+- **Bei Unklarheit zum Architektur-/Konventions-Punkt**: nicht raten — Frage notieren (in `docs/offene_fragen.md` und/oder als Issue) und User informieren
+- **Sessions sind nicht selbstdokumentierend**: wichtige Erkenntnisse in ADR, Commit-Body oder `docs/offene_fragen.md` festhalten — der nächste Agent / das nächste Team-Mitglied findet sie sonst nicht
+- **PR-Beschreibung ausführlich**: was, warum, wie getestet, Risiken — das Template fragt es ab
 
 ## Nützliche Referenzen
 
