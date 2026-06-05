@@ -42,7 +42,7 @@ CREATE TABLE dbo.T_VAT_STATEMENT (
 
     -- Pro Periode nur eine finale Abrechnung (F14): hier nicht als UNIQUE,
     -- weil der Reset auf DRAFT mehrere Versuche erlauben muss. Eindeutigkeit
-    -- wird in SF_CK_VAT_PERIOD / SP_CREATE_VAT_STATEMENT geprüft.
+    -- wird in fn_check_vat_period / sp_create_vat_statement geprueft.
 
     -- Konsistenz: wer APPROVED ist, hat APPROVED_BY/_AT gesetzt
     CONSTRAINT CHK_VAT_STATEMENT_APPROVED_FIELDS

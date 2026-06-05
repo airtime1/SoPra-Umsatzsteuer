@@ -1,5 +1,7 @@
 # Offene Fragen
 
+> **Hinweis (ab 2026-06-05):** Die laufende Verwaltung offener Punkte erfolgt über [GitHub Issues](https://github.com/airtime1/SoPra-Umsatzsteuer/issues). Diese Datei bleibt als Archiv und Übersicht — historischer Kontext und Auflösungen werden hier festgehalten, neue offene Punkte aber als Issue anlegen (Templates: `kind: question`, `kind: schnittstelle`, etc.). So sieht das ganze Team Status, Assignee und Fortschritt an einem Ort.
+
 Punkte, die wir extern klären müssen — ans Team, an Prof. Meth / Lehmann, oder an Partner-Gruppen.
 
 Format: `[Status] Frage — Adressat — Datum erstellt`. Status ∈ {OFFEN, GEKLÄRT, OBSOLET}.
