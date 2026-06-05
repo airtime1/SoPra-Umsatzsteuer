@@ -33,5 +33,5 @@ st.divider()
 st.subheader("Hinweise")
 st.info(
     "Diese App ist in der Entwicklung. Implementierte Funktionen: Anlage einer Abrechnung "
-    "(über SP_CREATE_VAT_STATEMENT). Status-Workflow (DRAFT → APPROVED → PAID) wird gerade gebaut."
+    "(über `stored_proc.sp_create_vat_statement`). Status-Workflow (DRAFT → APPROVED → PAID) wird gerade gebaut."
 )
