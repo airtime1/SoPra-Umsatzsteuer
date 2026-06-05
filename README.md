@@ -2,6 +2,8 @@
 
 Konzern-ERP-Modul für die monatliche Umsatzsteuerabrechnung. Liest Ein- und Ausgangsrechnungen aus vorgelagerten Modulen, aggregiert je Periode, berechnet Zahllast/Überhang, erzeugt einen revisionssicheren Abrechnungsbeleg.
 
+**Neu im Projekt?** Folge der [`ONBOARDING.md`](ONBOARDING.md) — komplettes Setup in ≈ 20 Minuten.
+
 **Briefing:** [`CLAUDE.md`](CLAUDE.md) · **Mitarbeiten:** [`CONTRIBUTING.md`](CONTRIBUTING.md) · **Entscheidungen:** [`docs/entscheidungen/`](docs/entscheidungen/) · **Offene Fragen:** [GitHub Issues](../../issues)
 
 ## Team
