@@ -69,3 +69,23 @@ def get_sandbox_conn() -> Iterator[pyodbc.Connection]:
         yield conn
     finally:
         conn.close()
+
+
+@contextmanager
+def get_active_conn() -> Iterator[pyodbc.Connection]:
+    """DB-Connection fuer die App, gesteuert ueber APP_DB_PROFILE."""
+    profile = os.getenv("APP_DB_PROFILE", "app").strip().lower()
+    connections = {
+        "app": get_app_conn,
+        "dev": get_dev_conn,
+        "sandbox": get_sandbox_conn,
+    }
+
+    if profile not in connections:
+        allowed = ", ".join(sorted(connections))
+        raise ValueError(
+            f"Unbekanntes APP_DB_PROFILE '{profile}'. Erlaubte Werte: {allowed}."
+        )
+
+    with connections[profile]() as conn:
+        yield conn

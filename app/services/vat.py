@@ -15,7 +15,7 @@ from typing import Optional
 
 import pandas as pd
 
-from app.db import get_app_conn
+from app.db import get_active_conn
 
 
 @dataclass
@@ -44,7 +44,7 @@ def list_statements() -> pd.DataFrame:
         FROM dbo.T_VAT_STATEMENT
         ORDER BY VAT_PERIOD DESC
     """
-    with get_app_conn() as conn:
+    with get_active_conn() as conn:
         return pd.read_sql(sql, conn)
 
 
@@ -58,13 +58,13 @@ def get_statement_items(statement_id: int) -> pd.DataFrame:
         WHERE VAT_STATEMENT_ID = ?
         ORDER BY SOURCE_TABLE, SOURCE_INVOICE_DATE
     """
-    with get_app_conn() as conn:
+    with get_active_conn() as conn:
         return pd.read_sql(sql, conn, params=[statement_id])
 
 
 def create_statement(period: str, created_by: str) -> int:
     """Ruft stored_proc.sp_create_vat_statement auf. Gibt die neue ID zurueck."""
-    with get_app_conn() as conn:
+    with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "EXEC stored_proc.sp_create_vat_statement @vat_period = ?, @created_by = ?",
@@ -78,7 +78,7 @@ def create_statement(period: str, created_by: str) -> int:
 
 def approve_statement(statement_id: int, approved_by: str) -> None:
     """DRAFT -> APPROVED via stored_proc.sp_approve_vat_statement."""
-    with get_app_conn() as conn:
+    with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "EXEC stored_proc.sp_approve_vat_statement @statement_id = ?, @approved_by = ?",
@@ -90,7 +90,7 @@ def approve_statement(statement_id: int, approved_by: str) -> None:
 
 def reject_statement(statement_id: int, rejected_by: str) -> None:
     """APPROVED -> DRAFT via stored_proc.sp_reject_vat_statement."""
-    with get_app_conn() as conn:
+    with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "EXEC stored_proc.sp_reject_vat_statement @statement_id = ?, @rejected_by = ?",
@@ -102,7 +102,7 @@ def reject_statement(statement_id: int, rejected_by: str) -> None:
 
 def pay_statement(statement_id: int, paid_by: str) -> None:
     """APPROVED -> PAID via stored_proc.sp_pay_vat_statement."""
-    with get_app_conn() as conn:
+    with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "EXEC stored_proc.sp_pay_vat_statement @statement_id = ?, @paid_by = ?",
