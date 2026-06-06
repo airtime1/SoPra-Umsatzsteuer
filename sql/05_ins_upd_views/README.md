@@ -6,8 +6,8 @@
 
 Mögliche Wrapper, falls benötigt:
 
-- `upd_views.UPD_VAT_STATEMENT_APPROVE` — setzt Status auf APPROVED inkl. APPROVED_BY/_AT
-- `upd_views.UPD_VAT_STATEMENT_REJECT` — APPROVED → DRAFT
-- `upd_views.UPD_VAT_STATEMENT_PAY` — APPROVED → PAID inkl. CLOSED_BY/_AT
+- `upd_views.V_UPD_VAT_STATEMENT_APPROVE` — setzt Status auf APPROVED inkl. APPROVED_BY/_AT
+- `upd_views.V_UPD_VAT_STATEMENT_REJECT` — APPROVED → DRAFT
+- `upd_views.V_UPD_VAT_STATEMENT_PAY` — APPROVED → PAID inkl. CLOSED_BY/_AT
 
 Alternativ: weitere Stored Procs in `sql/04_stored_proc/`. Vorteil von SPs gegenüber INSTEAD-OF-Triggern auf Views: explizite Eingabevalidierung und einfacher zu testen.

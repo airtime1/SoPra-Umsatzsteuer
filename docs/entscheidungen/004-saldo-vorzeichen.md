@@ -23,7 +23,7 @@ Begründung:
 
 ## Konsequenzen
 
-- `SF_CAL_VAT` muss intern signed rechnen, dann am Ende `ABS()` + Typ-Mapping anwenden:
+- `stored_func.fn_calculate_vat_balance` muss intern signed rechnen, dann am Ende `ABS()` + Typ-Mapping anwenden:
   - `output - input > 0` → `TYPE = 'ZAHLLAST'`, `BALANCE = output - input`
   - `output - input < 0` → `TYPE = 'UEBERHANG'`, `BALANCE = input - output`
   - `output - input = 0` → `TYPE = 'NEUTRAL'`, `BALANCE = 0`

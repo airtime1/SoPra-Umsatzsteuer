@@ -3,9 +3,9 @@
 Hier kommen Testdaten rein, die wir in die eigene Sandbox-DB einspielen, um die Stored Procs/Functions gegen realistische Inhalte zu testen.
 
 Idealer Inhalt:
-- Einige `T_INVOICE`-Zeilen (Ausgangsrechnungen) mit `TAX_AMOUNT`, gemischt aus mehreren Monaten
-- Einige `T_SUPPLIER_INVOICE`-Zeilen (Eingangsrechnungen) mit `TAX_AMOUNT`
+- Einige `T_INVOICE`-, `T_INVOICE_ITEM`- und `T_MATERIAL`-Zeilen (Ausgangsrechnungen); Umsatzsteuer wird aktuell aus `QUANTITY * SALES_PRICE * VAT / 100` aggregiert
+- Einige `T_SUPPLIER_INVOICE`- und `T_SUPPLIER_INVOICE_ITEM`-Zeilen (Eingangsrechnungen); Vorsteuer wird aktuell aus Item-Werten und `UNIT_VAT_PCT` aggregiert
 - Mindestens eine Korrektur-Rechnung (`IS_CORRECTION=1`)
 - Edge Cases: leerer Monat, nur USt, nur VSt, gemischt, exakt ausgeglichen
 
-Sobald wir den Dev-DB-Snapshot aus `99_devdb_kopie/` haben, können wir uns Daten daraus klauen statt selbst zu erfinden.
+Der Dev-DB-Snapshot aus `99_devdb_kopie/` darf lokal als Referenz dienen, wird aber nicht committed.

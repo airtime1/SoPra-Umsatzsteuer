@@ -5,8 +5,8 @@ Reihenfolge der Ausführung beim Aufbau einer leeren Sandbox:
 1. `00_setup/` — Stammdaten (`T_CODE`, `T_CODE_NEXT`). **An Architekt liefern** für `ERPDEV26S`. Auf eigener Sandbox selbst ausführen.
 2. `01_tables/` — Tabellen. **An Architekt liefern** für `ERPDEV26S`.
 3. `02_views/` — Lese-Views (`list_views.*`).
-4. `03_stored_func/` — Stored Functions (`stored_func.SF_*`).
-5. `04_stored_proc/` — Stored Procedures (`stored_proc.SP_*`).
+4. `03_stored_func/` — Stored Functions (`stored_func.fn_*`).
+5. `04_stored_proc/` — Stored Procedures (`stored_proc.sp_*`).
 6. `05_ins_upd_views/` — Schreib-Wrapper-Views (`ins_views.*`, `upd_views.*`) — wenn Architekt sie bestätigt.
 7. `99_seed/` — Testdaten für die Sandbox.
 

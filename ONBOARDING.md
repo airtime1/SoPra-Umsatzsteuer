@@ -90,9 +90,12 @@ SANDBOX_PASSWORD=<dein-hdm-db-passwort>
 # Frontend-User ist für alle gleich (steht schon im .env.example)
 APP_USER=ERP_REMOTE_USER
 APP_PASSWORD=Password123
+
+# Für lokale UI-Tests gegen deine Sandbox:
+APP_DB_PROFILE=sandbox
 ```
 
-> ⚠️ **`.env` ist via `.gitignore` vom Commit ausgeschlossen — das ist Absicht.** Niemals versuchen, das zu umgehen. Wenn `git status` deine `.env` zeigt, **STOP** und im Team melden.
+> **Wichtig:** `.env` ist via `.gitignore` vom Commit ausgeschlossen. Niemals versuchen, das zu umgehen. Wenn `git status` deine `.env` zeigt, STOP und im Team melden.
 
 ## 7. Verbindung testen
 
@@ -101,6 +104,8 @@ streamlit run app\main.py
 ```
 
 Browser sollte sich auf http://localhost:8501 öffnen. Auf „Übersicht" klicken — wenn keine Fehlermeldung kommt, ist die DB-Verbindung sauber. Tabelle wird leer sein, solange noch keine Abrechnungen angelegt wurden — das ist erwartet.
+
+Wenn du vorher `python scripts\deploy_sandbox.py` ausgeführt hast, teste die App lokal mit `APP_DB_PROFILE=sandbox`. Für die gemeinsame Dev-/Frontend-DB bleibt der Default `APP_DB_PROFILE=app`.
 
 Wenn ein **ODBC-Fehler** kommt: Driver-Name in `.env` prüfen. Bei ODBC 18 muss es heißen:
 ```ini
@@ -115,7 +120,8 @@ Bevor du loslegst, einmal kurz reinschauen:
 
 | Datei | Was steht drin |
 |---|---|
-| [`CLAUDE.md`](CLAUDE.md) | **Zentrales Briefing** — Tech-Stack, Team, Konventionen, alle Architekturentscheidungen verlinkt. Auch der KI-Agent (Claude/Codex) liest die automatisch. |
+| [`AGENTS.md`](AGENTS.md) | **Zentrales Agenten-Briefing** — Tech-Stack, Projektregeln, Lese-Reihenfolge und aktuelle Architektur fuer Claude/Codex. |
+| [`CLAUDE.md`](CLAUDE.md) | **Claude-Einstieg** — verweist auf `AGENTS.md`, damit Claude und Codex denselben Stand nutzen. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Workflow-Regeln** — wie wir Branches benennen, Commits schreiben, PRs machen. Bitte ganz lesen. |
 | [`docs/entscheidungen/`](docs/entscheidungen/) | **ADRs 001–007** — warum wir Status englisch nennen, warum Saldo immer positiv ist, etc. |
 | [`docs/inkonsistenzen.md`](docs/inkonsistenzen.md) | MS3 ↔ MS4 Konflikte und wie wir sie aufgelöst haben |
@@ -126,7 +132,10 @@ Bevor du loslegst, einmal kurz reinschauen:
 Niemals direkt auf `main` — branchen und PR.
 
 ```powershell
-git checkout main && git pull
+git status --short --branch
+git fetch origin
+git checkout main
+git pull --ff-only
 git checkout -b feat/<kurze-beschreibung>     # z.B. feat/seed-daten-januar
 # arbeiten ...
 git add <files>
@@ -176,8 +185,8 @@ Hak ab, wenn erledigt:
 - [ ] `pip install -r requirements.txt` ohne Fehler
 - [ ] `.env` mit eigenen Credentials erstellt
 - [ ] `streamlit run app\main.py` läuft, Übersicht ohne Fehler
-- [ ] `CLAUDE.md` und `CONTRIBUTING.md` einmal überflogen
+- [ ] `AGENTS.md`, `CLAUDE.md` und `CONTRIBUTING.md` einmal überflogen
 
 Wenn alle 8 Häkchen stehen, bist du startklar. Im Team kurz Bescheid geben — dann kann dir jemand dein erstes Issue zuweisen oder mit dir ein PaarProgramming-Setup für den ersten PR machen.
 
-Willkommen 👋
+Willkommen.

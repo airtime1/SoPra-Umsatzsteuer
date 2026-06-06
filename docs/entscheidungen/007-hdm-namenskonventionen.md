@@ -23,7 +23,7 @@ Bei Verstößen droht laut Vorgabe: „Objekte, die nicht den Namenskonventionen
 - Alle `sql/03_stored_func/`, `sql/04_stored_proc/`, `sql/02_views/`-Skripte umgeschrieben/umbenannt.
 - Frontend (`app/services/vat.py`) ruft die neuen Namen auf.
 - Tests in `tests/sql/` aktualisiert.
-- `CLAUDE.md` reflektiert die korrigierten Namen.
+- `AGENTS.md`, `sql/README.md` und die Testdokumentation reflektieren die korrigierten Namen; `CLAUDE.md` verweist nur noch auf `AGENTS.md`.
 - Bei zukünftigen Erweiterungen IMMER zuerst in der Dev-DB-Kopie nach Vorbildern suchen, bevor neue Patterns erfunden werden.
 
 ## Beobachtung in Dev-DB

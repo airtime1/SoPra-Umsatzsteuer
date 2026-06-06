@@ -12,14 +12,15 @@ Format: `[Status] Frage — Adressat — Datum erstellt`. Status ∈ {OFFEN, GEK
 - [OFFEN] Wie ist der konkrete Prozess zur Anlage von Tabellen / T_CODE-Einträgen? Skript per Mail an den Architekt? Pull-Request? — Architekt
 - [OFFEN] Brauchen wir `ins_views` / `upd_views` für jeden Schreibvorgang aus dem Frontend, oder darf `ERP_REMOTE_USER` direkt auf Tabellen schreiben? — Architekt
 - [GEKLÄRT 2026-06-03] HdM-Namenskonventionen liegen in `docs/namenskonventionen/Lerneinheit_7_Datenbankentwicklung.docx` (+ Zusammenfassung in `INDEX.md`). SQL-Skelette entsprechend refactored (ADR-007).
-- [GEKLÄRT 2026-06-03] Dev-DB-Snapshot liegt in `sql/99_devdb_kopie/cre_devdb_11.05.2026.utf8.sql`. Wichtigste Befunde: `T_INVOICE`/`T_SUPPLIER_INVOICE` haben aktuell KEINE `TAX_AMOUNT`-Spalte; `T_CODE.ID_CODE` ist KEIN IDENTITY; `T_CODE_NEXT` hat `SECURITY_LEVEL`-Spalte für Rollencheck.
+- [GEKLÄRT 2026-06-03] Dev-DB-Snapshot wurde ausgewertet, wird aber nicht committed (siehe `sql/99_devdb_kopie/README.md`). Wichtigste Befunde: `T_INVOICE`/`T_SUPPLIER_INVOICE` haben aktuell KEINE `TAX_AMOUNT`-Spalte; `T_CODE.ID_CODE` ist KEIN IDENTITY; `T_CODE_NEXT` hat `SECURITY_LEVEL`-Spalte für Rollencheck.
 
 ## Schnittstellen zu anderen Gruppen
 
-Stand laut User: Werte und Inhalt sind geklärt, **konkrete Spaltennamen** der anderen Gruppen stehen noch aus. Sobald die kommen, müssen `list_views.V_LIST_OUTPUT_VAT` und `list_views.V_LIST_INPUT_VAT` angepasst werden — der Rest der Pipeline (sp_create_vat_statement, fn_*) bleibt unverändert.
+Stand der aktuellen Repository-Dokumentation: Werte und Inhalt sind fachlich vorgeklaert, konkrete Schnittstellenfragen bleiben aber offen. `list_views.V_LIST_OUTPUT_VAT` berechnet die Ausgangssteuer aktuell aus `T_INVOICE_ITEM` und `T_MATERIAL.VAT`; offen bleiben dort Korrekturfelder. `list_views.V_LIST_INPUT_VAT` ist implementiert, lieferte im Professor-Snapshot laut PR #19 aber aktuell keine Daten. Wenn Schnittstellen finalisiert werden, sollen nur die Views angepasst werden; der Rest der Pipeline (`stored_proc.sp_create_vat_statement`, `stored_func.fn_*`) bleibt möglichst unverändert.
 
 - [OFFEN] Gruppe 4 (Eingangsrechnungen): Exakte Spaltennamen für `TAX_AMOUNT` auf `T_SUPPLIER_INVOICE` (oder bleibt es bei Item-Aggregation aus `T_SUPPLIER_INVOICE_ITEM.UNIT_VAT_PCT`)?
-- [OFFEN] Gruppe 7 (Ausgangsrechnungen): Exakte Spaltennamen für `TAX_AMOUNT`, `IS_CORRECTION`, `ORIGINAL_INVOICE_ID` auf `T_INVOICE`?
+- [GEKLÄRT 2026-06-06] Gruppe 7 (Ausgangsrechnungen): `T_INVOICE` hat keine `TAX_AMOUNT`-Spalte; `list_views.V_LIST_OUTPUT_VAT` aggregiert über `T_INVOICE_ITEM` und `T_MATERIAL.VAT`.
+- [OFFEN] Gruppe 7 (Ausgangsrechnungen): Belastbare Schnittstelle für `IS_CORRECTION` und `ORIGINAL_INVOICE_ID`.
 - [OFFEN] Gruppe 8 (Zahlungen / Skonto): Skonto als eigene Korrektur-Rechnung oder Mutation der Ursprungsrechnung?
 - [OFFEN] Gruppen 9/10 (Barrechnung Freiburg/Rosenberg): Eigene Tabelle oder Eintrag in `T_INVOICE`?
 - [OFFEN] Gruppe 19 (FiBu) ist unbesetzt — bestätigen, dass wir nur theoretisch ausgeben und keinen abnehmenden Konsumenten haben.
@@ -33,7 +34,7 @@ Stand laut User: Werte und Inhalt sind geklärt, **konkrete Spaltennamen** der a
 ## Team-intern
 
 - [OFFEN] Finale Frontend-Entscheidung: Python (vorläufig) vs. phpRunner — Stichtag für Wechsel-Option?
-- [OFFEN] Repo-Host: GitHub privat, HdM-Gitlab, oder lokal?
+- [GEKLÄRT 2026-06-05] Repo-Host ist GitHub (`airtime1/SoPra-Umsatzsteuer`) mit Issues, PR-Template und Issue-Templates.
 - [OFFEN] Aufgabenteilung MS5: Wer baut welchen Teil (SQL / Frontend / Tests / Doku)?
 
 ## Organisatorisch / Abgabe

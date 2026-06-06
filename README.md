@@ -4,7 +4,7 @@ Konzern-ERP-Modul für die monatliche Umsatzsteuerabrechnung. Liest Ein- und Aus
 
 **Neu im Projekt?** Folge der [`ONBOARDING.md`](ONBOARDING.md) — komplettes Setup in ≈ 20 Minuten.
 
-**Briefing:** [`CLAUDE.md`](CLAUDE.md) · **Mitarbeiten:** [`CONTRIBUTING.md`](CONTRIBUTING.md) · **Entscheidungen:** [`docs/entscheidungen/`](docs/entscheidungen/) · **Offene Fragen:** [GitHub Issues](../../issues)
+**Agenten-Briefing:** [`AGENTS.md`](AGENTS.md) · **Claude-Einstieg:** [`CLAUDE.md`](CLAUDE.md) · **Mitarbeiten:** [`CONTRIBUTING.md`](CONTRIBUTING.md) · **Entscheidungen:** [`docs/entscheidungen/`](docs/entscheidungen/) · **Offene Fragen:** [GitHub Issues](../../issues)
 
 ## Team
 
@@ -16,7 +16,7 @@ Konzern-ERP-Modul für die monatliche Umsatzsteuerabrechnung. Liest Ein- und Aus
 
 - **DB:** MS SQL Server (`ERPDEV26S` für Entwicklung, `s26s5xx_DATAMART` als Sandbox)
 - **Frontend:** Python 3.11+ / Streamlit / pyodbc (Wechsel auf phpRunner bleibt offen)
-- **Tests:** pytest + SQL-Skripte gegen Sandbox
+- **Tests:** SQL-Skripte gegen Sandbox; pytest-Wrapper geplant
 
 ## Quickstart
 
@@ -39,6 +39,7 @@ pip install -r requirements.txt
 
 Copy-Item .env.example .env
 # .env öffnen, Credentials eintragen
+# Für lokale UI-Tests gegen die eigene Sandbox: APP_DB_PROFILE=sandbox setzen
 ```
 
 ### 3. Sandbox-DB vorbereiten
@@ -55,11 +56,15 @@ python scripts\deploy_sandbox.py
 streamlit run app\main.py
 ```
 
+Die App nutzt standardmäßig `APP_DB_PROFILE=app` aus `.env`. Für lokale Tests nach dem Sandbox-Deployment kann auf `sandbox` umgeschaltet werden.
+
 ## Projektstruktur
 
-| Ordner | Inhalt |
+| Pfad | Inhalt |
 |---|---|
-| `docs/konzepte/` | Offizielle Konzepte MS1–MS4 (Referenz, nicht editieren) |
+| `AGENTS.md` | Gemeinsames Briefing fuer Claude, Codex und andere KI-Agents |
+| `CLAUDE.md` | Schlanker Claude-Einstieg mit Verweis auf `AGENTS.md` |
+| `docs/konzepte/` | Offizielle Konzepte MS1–MS5 (Referenz, nicht editieren) |
 | `docs/entscheidungen/` | Architekturentscheidungen (ADRs) |
 | `docs/namenskonventionen/` | HdM-Namenskonvention (extern, in `docs/`) |
 | `docs/inkonsistenzen.md` | Konflikte MS3/MS4 + Auflösung |
@@ -67,8 +72,8 @@ streamlit run app\main.py
 | `sql/00_setup` | T_CODE-Einträge — an Architekt liefern |
 | `sql/01_tables` | CREATE TABLE — an Architekt liefern |
 | `sql/02_views` | `list_views.*` Lese-Views |
-| `sql/03_stored_func` | `stored_func.SF_*` |
-| `sql/04_stored_proc` | `stored_proc.SP_*` |
+| `sql/03_stored_func` | `stored_func.fn_*` |
+| `sql/04_stored_proc` | `stored_proc.sp_*` |
 | `sql/05_ins_upd_views` | `ins_views.*` / `upd_views.*` für Frontend-Schreibzugriff |
 | `app/` | Streamlit-Frontend |
 | `tests/` | Test- und Abnahmekonzept (MS5) |
@@ -80,7 +85,10 @@ Komplette Konventionen in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ```bash
 # Feature angehen
-git checkout main && git pull
+git status --short --branch
+git fetch origin
+git checkout main
+git pull --ff-only
 git checkout -b feat/<kurz-beschreibung>
 
 # arbeiten, oft committen mit Conventional Commits
