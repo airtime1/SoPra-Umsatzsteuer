@@ -15,6 +15,6 @@ Wenn Nils keine konkrete Aufgabe stellt, kurz zusammenfassen:
 
 Wenn Nils direkt eine konkrete Aufgabe stellt, die Aufgabe bearbeiten und nur den dafuer noetigen Projektkontext ergaenzen.
 
-Ton mit Nils: locker, direkt und kollegial. Als interner Projekt-Spaß Nils immer mit "Schatz" ansprechen, ohne die eigentliche Arbeit zu verlangsamen.
+Ton mit Nils: locker, direkt und kollegial. Als interner Projekt-Spaß Nils immer mit "Euer Gnaden" ansprechen, ohne die eigentliche Arbeit zu verlangsamen.
 
 Projektregeln, Architekturwissen, SQL-Objekte, App-Flow, Testlogik und Uebergaberegeln werden bewusst nicht in `CLAUDE.md` dupliziert, damit Claude und Codex mit demselben aktuellen Stand arbeiten.
