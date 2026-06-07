@@ -16,7 +16,7 @@ Konzern-ERP-Modul für die monatliche Umsatzsteuerabrechnung. Liest Ein- und Aus
 
 - **DB:** MS SQL Server (`ERPDEV26S` für Entwicklung, `s26s5xx_DATAMART` als Sandbox)
 - **Frontend:** Python 3.11+ / Streamlit / pyodbc (Wechsel auf phpRunner bleibt offen)
-- **Tests:** SQL-Skripte gegen Sandbox; pytest-Wrapper geplant
+- **Tests:** SQL-Skripte gegen Sandbox inkl. Demo-Workflow; pytest-Wrapper geplant
 
 ## Quickstart
 
@@ -44,7 +44,7 @@ Copy-Item .env.example .env
 
 ### 3. Sandbox-DB vorbereiten
 
-Skripte aus `sql/` der Reihe nach gegen die eigene Sandbox `s26s5xx_DATAMART` ausführen:
+Skripte aus `sql/` der Reihe nach gegen die eigene Sandbox `s26s5xx_DATAMART` ausführen. Dabei werden auch die Demo-Seed-Daten aus `sql/99_seed/` eingespielt:
 
 ```powershell
 python scripts\deploy_sandbox.py
@@ -58,6 +58,11 @@ streamlit run app\main.py
 
 Die App nutzt standardmäßig `APP_DB_PROFILE=app` aus `.env`. Für lokale Tests nach dem Sandbox-Deployment kann auf `sandbox` umgeschaltet werden.
 
+### 5. Demo-Workflow prüfen
+
+- In der App: Übersicht öffnen, neue abrechenbare Periode erstellen, Detailseite prüfen, freigeben, abschließen.
+- Per SQL: Tests aus `tests/sql/` gegen die Sandbox ausführen; die Demo-Tests erwarten in allen Ergebniszeilen `PASS`.
+
 ## Projektstruktur
 
 | Pfad | Inhalt |
@@ -65,6 +70,8 @@ Die App nutzt standardmäßig `APP_DB_PROFILE=app` aus `.env`. Für lokale Tests
 | `AGENTS.md` | Gemeinsames Briefing fuer Claude, Codex und andere KI-Agents |
 | `CLAUDE.md` | Schlanker Claude-Einstieg mit Verweis auf `AGENTS.md` |
 | `docs/konzepte/` | Offizielle Konzepte MS1–MS5 (Referenz, nicht editieren) |
+| `docs/zielbild.md` | Aktuelles fachliches Zielbild nach Konzept- und DEV-DB-Prüfung |
+| `docs/schnittstellen_annahmen.md` | Geprüfte Fremdtabellen/-Views, Annahmen und offene Schnittstellenfragen |
 | `docs/entscheidungen/` | Architekturentscheidungen (ADRs) |
 | `docs/namenskonventionen/` | HdM-Namenskonvention (extern, in `docs/`) |
 | `docs/inkonsistenzen.md` | Konflikte MS3/MS4 + Auflösung |
@@ -75,6 +82,7 @@ Die App nutzt standardmäßig `APP_DB_PROFILE=app` aus `.env`. Für lokale Tests
 | `sql/03_stored_func` | `stored_func.fn_*` |
 | `sql/04_stored_proc` | `stored_proc.sp_*` |
 | `sql/05_ins_upd_views` | `ins_views.*` / `upd_views.*` für Frontend-Schreibzugriff |
+| `sql/99_seed` | Realistische Demo-Daten für die Sandbox |
 | `app/` | Streamlit-Frontend |
 | `tests/` | Test- und Abnahmekonzept (MS5) |
 | `scripts/` | Deploy-Helfer |

@@ -24,9 +24,17 @@ CREATE TABLE dbo.T_VAT_STATEMENT (
     CLOSED_BY           VARCHAR(50) NULL,
     CLOSED_AT           DATETIME    NULL,
 
-    -- Format YYYY-MM erzwingen
+    -- Format YYYY-MM mit echtem Monat 01..12 erzwingen
     CONSTRAINT CHK_VAT_STATEMENT_PERIOD
-        CHECK (VAT_PERIOD LIKE '[0-9][0-9][0-9][0-9]-[0-1][0-9]'),
+        CHECK (
+            VAT_PERIOD LIKE '[0-9][0-9][0-9][0-9]-[0-1][0-9]'
+            AND RIGHT(VAT_PERIOD, 2) BETWEEN '01' AND '12'
+        ),
+
+    -- Pro Periode genau ein Arbeitsstand. DRAFT wird neu berechnet,
+    -- APPROVED/PAID sperren die Periode fachlich.
+    CONSTRAINT UQ_VAT_STATEMENT_PERIOD
+        UNIQUE (VAT_PERIOD),
 
     -- Status nur erlaubte Werte
     CONSTRAINT CHK_VAT_STATEMENT_STATUS
@@ -39,10 +47,6 @@ CREATE TABLE dbo.T_VAT_STATEMENT (
     -- Typ nur erlaubte Werte (oder NULL solange im DRAFT)
     CONSTRAINT CHK_VAT_STATEMENT_TYPE
         CHECK (VAT_TYPE IN ('ZAHLLAST', 'UEBERHANG', 'NEUTRAL') OR VAT_TYPE IS NULL),
-
-    -- Pro Periode nur eine finale Abrechnung (F14): hier nicht als UNIQUE,
-    -- weil der Reset auf DRAFT mehrere Versuche erlauben muss. Eindeutigkeit
-    -- wird in fn_check_vat_period / sp_create_vat_statement geprueft.
 
     -- Konsistenz: wer APPROVED ist, hat APPROVED_BY/_AT gesetzt
     CONSTRAINT CHK_VAT_STATEMENT_APPROVED_FIELDS
@@ -58,7 +62,3 @@ CREATE TABLE dbo.T_VAT_STATEMENT (
             OR VAT_STATUS IN ('DRAFT', 'APPROVED')
         )
 );
-
--- Index für die häufigste Filterung (Periode)
-CREATE INDEX IX_VAT_STATEMENT_PERIOD
-    ON dbo.T_VAT_STATEMENT (VAT_PERIOD);

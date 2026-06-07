@@ -19,7 +19,9 @@ st.caption("SoPra SoSe 2026 — Gruppe 15 — Adventure Bike ERP")
 
 st.markdown(
     """
-    Willkommen im Modul **Umsatzsteuerabrechnung**.
+    Dieses Modul sammelt steuerrelevante Eingangs- und Ausgangsbelege je Monat,
+    berechnet Zahllast oder Vorsteuerüberhang und friert die Belegbasis im
+    Status-Workflow revisionsnah ein.
 
     Nutze die Navigation links:
 
@@ -32,6 +34,6 @@ st.markdown(
 st.divider()
 st.subheader("Hinweise")
 st.info(
-    "Diese App ist in der Entwicklung. Implementierte Funktionen: Anlage einer Abrechnung "
-    "(über `stored_proc.sp_create_vat_statement`). Status-Workflow (DRAFT → APPROVED → PAID) wird gerade gebaut."
+    "Für lokale Demo-Tests: `.env` auf `APP_DB_PROFILE=sandbox` setzen, Sandbox deployen "
+    "und die Seed-Daten aus `sql/99_seed/` einspielen."
 )

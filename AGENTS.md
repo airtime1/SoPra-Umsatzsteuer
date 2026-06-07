@@ -82,10 +82,14 @@ Wichtige eigene Objekte:
 | `dbo.T_VAT_STATEMENT` | Kopf einer monatlichen Umsatzsteuerabrechnung |
 | `dbo.T_VAT_STATEMENT_ITEM` | Detailzeilen mit einzelnen Steuerfaellen |
 | `list_views.LOV_VAT_STATUS` | Werteliste fuer `DRAFT`, `APPROVED`, `PAID` |
-| `list_views.V_LIST_OUTPUT_VAT` | Ausgangsrechnungen / Umsatzsteuer aus Gruppe 7; Steuerbetrag aus `T_INVOICE_ITEM` und `T_MATERIAL.VAT` aggregiert |
+| `list_views.V_LIST_OUTPUT_VAT` | Ausgangsrechnungen / Umsatzsteuer aus Gruppe 7; Steuerbetrag itembasiert aggregiert, optional mit Skonto-/Zahlungskorrekturen aus `T_PAYMENT_RECEIPT` |
 | `list_views.V_LIST_INPUT_VAT` | Eingangsrechnungen / Vorsteuer aus Gruppe 4; Steuerbetrag aus Supplier-Invoice-Items aggregiert |
+| `list_views.V_LIST_VAT_STATEMENT` | Anzeige-View fuer Abrechnungskopf |
+| `list_views.V_LIST_VAT_STATEMENT_ITEM` | Anzeige-View fuer Abrechnungspositionen |
+| `list_views.V_LIST_VAT_USER` | Minimale User-/Rollen-View ohne Passwortdaten |
 | `stored_func.fn_check_vat_period` | Prueft Periodenformat, 10.-des-Folgemonats-Regel und Sperrstatus |
 | `stored_func.fn_calculate_vat_balance` | Berechnet `VAT_BALANCE` als Absolutbetrag und `VAT_TYPE` |
+| `stored_func.fn_get_user_security_level` | Ermittelt `T_USER.SECURITYLEVEL` fuer Rollenpruefungen |
 | `stored_proc.sp_create_vat_statement` | Legt Abrechnung an oder berechnet bestehenden `DRAFT` neu |
 | `stored_proc.sp_approve_vat_statement` | Statuswechsel `DRAFT` -> `APPROVED` |
 | `stored_proc.sp_pay_vat_statement` | Statuswechsel `APPROVED` -> `PAID` |
@@ -97,21 +101,23 @@ Verbindliche DB-Regeln:
 - HdM-Namenskonventionen strikt einhalten: Tabellen und Tabellenspalten UPPER_CASE, Procedures/Functions klein mit `sp_`/`fn_`, Views mit `LOV_`, `V_LIST_`, `V_INS_`, `V_UPD_`.
 - `VAT_BALANCE` ist immer ein nicht-negativer Absolutbetrag; `VAT_TYPE` unterscheidet `ZAHLLAST`, `UEBERHANG`, `NEUTRAL`.
 - Abgeschlossene oder freigegebene Abrechnungen duerfen nicht neu berechnet werden; nur `DRAFT` darf durch `sp_create_vat_statement` ersetzt werden.
+- Eine Periode darf nur einmal existieren (`VAT_PERIOD` eindeutig). Bestehende Sandbox-/DEV-Instanzen werden ueber idempotente Constraint-Skripte nachgezogen.
+- Status-Procedures pruefen Rollen ueber `T_CODE_NEXT.SECURITY_LEVEL` und `T_USER.SECURITYLEVEL`: Sachbearbeiter `1`, Leitung FiBu `2`, CFO `3`.
 
 ## App-Flow
 
 Streamlit findet die Seiten automatisch unter `app/pages/`.
 
 1. `app/main.py` initialisiert die App und erklaert die Navigation.
-2. `app/pages/1_Übersicht.py` zeigt bestehende Abrechnungen.
-3. `app/pages/2_Neue_Abrechnung.py` legt eine Periode ueber `stored_proc.sp_create_vat_statement` an oder berechnet einen `DRAFT` neu.
-4. `app/pages/3_Detail.py` zeigt Kopf und Items und ruft die Status-Procedures auf.
-5. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe und nutzt `get_active_conn()`.
+2. `app/pages/1_Übersicht.py` zeigt bestehende Abrechnungen mit Statusfilter und Kennzahlen.
+3. `app/pages/2_Neue_Abrechnung.py` legt eine Periode ueber `stored_proc.sp_create_vat_statement` an oder berechnet einen `DRAFT` neu. Der Default ist die letzte nach 10.-des-Folgemonats-Regel abrechenbare Periode.
+4. `app/pages/3_Detail.py` zeigt Kopf und Items, Audit-Spuren und ruft die Status-Procedures mit passenden Demo-Rollen auf.
+5. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe, liest aus Anzeige-Views und nutzt `get_active_conn()`.
 6. `app/db.py` liest `.env`, stellt App-, Dev- und Sandbox-Verbindungen bereit und waehlt die aktive App-Verbindung ueber `APP_DB_PROFILE`.
 
 Nach PR #19 koennen lokale UI-Tests gegen die Sandbox laufen, ohne den Code umzubauen: In `.env` `APP_DB_PROFILE=sandbox` setzen, Sandbox deployen und dann `streamlit run app/main.py` starten.
 
-Die UI enthaelt aktuell einen einfachen User-Login-Text/Hack (`s26s5xx`). Eine echte Authentifizierung oder rollenbasierte UI-Steuerung ist noch offen.
+Die UI enthaelt weiterhin keine echte Authentifizierung. Sie bietet aber Demo-User je Rolle aus `list_views.V_LIST_VAT_USER` an; die verbindliche Rollenpruefung liegt in den Stored Procedures.
 
 ## Deployment und Sandbox
 
@@ -124,10 +130,12 @@ Die UI enthaelt aktuell einen einfachen User-Login-Text/Hack (`s26s5xx`). Eine e
 
 - `tests/test_cases.md` ist der Testfall-Katalog.
 - `tests/abnahmekriterien.md` beschreibt SPC-1 bis SPC-9.
-- `tests/sql/fn_calculate_vat_balance_basic.sql` ist der aktuell vorhandene ausfuehrbare SQL-Test.
+- `tests/sql/fn_calculate_vat_balance_basic.sql` prueft die Saldo-/Typberechnung.
+- `tests/sql/sp_create_vat_statement_demo.sql` prueft die Anlage der Demo-Abrechnung gegen Seed-Daten.
+- `tests/sql/sp_status_workflow_roles_demo.sql` prueft Statusfolge, Rollen und Sperre bezahlter Perioden.
 - `tests/sql/README.md` beschreibt die Konvention fuer weitere SQL-Tests.
 - Ein `tests/python/`-pytest-Wrapper ist dokumentiert, aber noch nicht umgesetzt.
-- Tests laufen gegen eine bekannte Sandbox mit Seed-Daten; `sql/99_seed/` enthaelt derzeit nur die README und noch keine Seed-Skripte.
+- Tests laufen gegen eine bekannte Sandbox mit Seed-Daten; `sql/99_seed/001_demo_vat_workflow.sql` erzeugt realistische Demo-Belege.
 
 ## Dauerhaft relevante Entscheidungen
 
@@ -152,12 +160,12 @@ Aus der Git-Historie dauerhaft relevant:
 
 ## Bekannte Einschraenkungen und offene Punkte
 
-- Konkrete finale Schnittstellen-Spalten von Gruppe 4 und Gruppe 7 sind noch teilweise offen. `T_INVOICE` hat laut dokumentiertem Dev-DB-Befund keine fertige `TAX_AMOUNT`-Spalte; die Ausgangssteuer wird deshalb aktuell aus `T_INVOICE_ITEM` und `T_MATERIAL.VAT` berechnet.
-- `list_views.V_LIST_OUTPUT_VAT` liefert echte `TAX_AMOUNT`-Aggregation, aber `IS_CORRECTION` und `ORIGINAL_INVOICE_ID` bleiben feste Defaultwerte, bis Gruppe 7 die Korrektur-Schnittstelle finalisiert.
-- `list_views.V_LIST_INPUT_VAT` ist implementiert, lieferte im Professor-Snapshot laut PR #19 aber aktuell keine Daten.
-- Rollenpruefungen in den Status-Procedures sind noch nicht technisch umgesetzt; aktuell gilt Trust on Caller.
+- Konkrete finale Schnittstellen-Spalten von Gruppe 4, Gruppe 7 und Gruppe 8 sind noch teilweise offen. `T_INVOICE` hat laut DEV-Befund keine fertige `TAX_AMOUNT`-Spalte; die Ausgangssteuer wird deshalb aktuell aus Items berechnet.
+- `list_views.V_LIST_OUTPUT_VAT` liefert je nach Ziel-DB-Schema Rechnungsteuer und optional Skonto-/Zahlungskorrekturen. In aelteren Sandbox-Staenden fehlen die Zahlungskorrekturspalten noch.
+- `list_views.V_LIST_INPUT_VAT` ist implementiert; DEV enthielt am 2026-06-07 aber keine Eingangsrechnungsdaten.
+- Rollenpruefungen in den Status-Procedures sind technisch umgesetzt, ersetzen aber keine echte Authentifizierung im Streamlit-Prototyp.
 - `ins_views`/`upd_views` sind als Ordner vorgesehen, aber aktuell nicht implementiert und moeglicherweise durch Stored Procedures ersetzbar.
-- Seed-Daten fuer Sandbox und eine automatisierte pytest-Suite fehlen noch.
+- Eine automatisierte pytest-Suite fehlt noch.
 - Finale Frontend-Entscheidung Python/Streamlit vs. phpRunner bleibt offen; deshalb Frontend duenn halten.
 - Offene Punkte werden primaer als GitHub Issues gepflegt. `docs/offene_fragen.md` bleibt Archiv und Uebersicht fuer fachliche Klaerungen.
 

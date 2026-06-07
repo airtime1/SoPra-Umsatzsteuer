@@ -14,10 +14,21 @@ from app.services import vat
 
 st.title("Neue Abrechnung")
 
+try:
+    users = vat.list_users()
+except Exception as exc:
+    st.error(f"Benutzer-/Rollenliste konnte nicht geladen werden: {exc}")
+    st.stop()
+
 today = date.today()
-# Standardvorschlag: Vormonat
-default_year = today.year if today.month > 1 else today.year - 1
-default_month = today.month - 1 if today.month > 1 else 12
+# Standardvorschlag: letzte Periode, die nach der 10.-des-Folgemonats-Regel
+# bereits abgerechnet werden darf.
+month_offset = 1 if today.day >= 10 else 2
+default_year = today.year
+default_month = today.month - month_offset
+while default_month <= 0:
+    default_month += 12
+    default_year -= 1
 
 col1, col2 = st.columns(2)
 with col1:
@@ -28,8 +39,15 @@ with col2:
 period = f"{int(year):04d}-{int(month):02d}"
 st.write(f"Abrechnungsperiode: **{period}**")
 
-# Vorläufiger User-Hack — später aus Auth/Session
-created_by = st.text_input("Bearbeiter (User-Login)", value="s26s5xx")
+clerks = users[users["SECURITYLEVEL"] == 1]
+if clerks.empty:
+    created_by = st.text_input("Bearbeiter (User-Login)", value="")
+else:
+    created_by = st.selectbox(
+        "Bearbeiter",
+        options=clerks["USERNAME"].tolist(),
+        format_func=lambda user: f"{user} — Sachbearbeiter",
+    )
 
 if st.button("Abrechnung erstellen / neu berechnen", type="primary"):
     try:
