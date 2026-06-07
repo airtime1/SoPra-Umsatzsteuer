@@ -10,7 +10,7 @@ Beim Übergang vom Fach- ins Systemkonzept sind mehrere Konflikte und Unklarheit
 | 4 | Belegdatum-Spalte | nicht detailliert | in Beschreibung `SOURCE_INVOICE_DATE`, im CREATE TABLE `INVOICE_DATE` | **`SOURCE_INVOICE_DATE`** | [003](entscheidungen/003-namen.md) |
 | 5 | Vorzeichen Saldo | Beispiel zeigt `-95` als Überhang (negativ) | SF_CAL_VAT: Überhang = negativ, aber Testcase zeigt `VAT_BALANCE = 100` (positiv) + `TYPE = Überhang` | **`VAT_BALANCE` immer ≥0 (Absolutbetrag), `VAT_TYPE` markiert ZAHLLAST/UEBERHANG/NEUTRAL** | [004](entscheidungen/004-saldo-vorzeichen.md) |
 | 6 | Korrekturen-Modellierung | Beispiel hat eigene Zeile `K1235 -6,70` | MS4 mischt: Spalte auf Quellrechnung (`IS_CORRECTION`/`ORIGINAL_INVOICE_ID`) UND eigene Item-Zeile | **Eigene Zeile in T_VAT_STATEMENT_ITEM mit `IS_CORRECTION=1`, negativer Betrag, `ORIGINAL_INVOICE_ID` zeigt Ursprung** | [005](entscheidungen/005-korrekturen.md) |
-| 7 | "Sofia ist Abschaum" in MS2 Ziel-Section | drin | n/a | **Vor jeder weiteren Abgabe-Version raus** | — |
+| 7 | Unprofessioneller Satz in MS2 Ziel-Section | drin | n/a | **Vor jeder weiteren Abgabe-Version entfernen** | — |
 
 ## Weitere kleinere Diskrepanzen
 
@@ -18,5 +18,5 @@ Beim Übergang vom Fach- ins Systemkonzept sind mehrere Konflikte und Unklarheit
 - MS4 erwähnt nicht explizit `ins_views` / `upd_views` für Frontend-Schreibzugriff. Da `ERP_REMOTE_USER` nur read/write/execute hat, brauchen wir vermutlich Wrapper-Views. → Stand jetzt über Stored Procs gelöst (`sp_create_vat_statement`, `sp_approve_*`, `sp_pay_*`, `sp_reject_*`), Insert/Update-Views aktuell nicht nötig.
 - View-Namen im MS4: `OUTPUT_VAT_TOTAL` (Singular) vs. "OUTPUT_VAT_TOTALT" (Tippfehler). → mit HdM-Konventionen umbenannt zu `V_LIST_OUTPUT_VAT` (ADR-007).
 - MS4 referenziert `T_INOVICE` an einer Stelle (Tippfehler) — gemeint ist `T_INVOICE`.
-- **MS4 vs. tatsächliche Dev-DB:** MS4 nimmt an, dass `T_INVOICE` und `T_SUPPLIER_INVOICE` jeweils eine `TAX_AMOUNT`-Spalte auf der Kopf-Ebene haben. Dev-DB-Snapshot vom 11.05.2026 zeigt: Spalte existiert NICHT, Steuer liegt nur auf Item-Ebene (`T_SUPPLIER_INVOICE_ITEM.UNIT_VAT_PCT`) oder ist noch zu ergänzen. → Views in `sql/02_views/` mit klarem TODO; werden angepasst, sobald Gruppen 4/7 die finalen Spalten liefern.
+- **MS4 vs. tatsächliche Dev-DB:** MS4 nimmt an, dass `T_INVOICE` und `T_SUPPLIER_INVOICE` jeweils eine `TAX_AMOUNT`-Spalte auf Kopf-Ebene haben. Dev-DB-Snapshot vom 11.05.2026 zeigt: diese Spalten existieren nicht. Aktueller Soll-Stand: `list_views.V_LIST_OUTPUT_VAT` aggregiert aus `T_INVOICE_ITEM` und `T_MATERIAL.VAT`; `list_views.V_LIST_INPUT_VAT` aggregiert aus `T_SUPPLIER_INVOICE_ITEM`. Offen bleiben Korrekturfelder bei Gruppe 7 und die Frage, warum die Vorsteuer-View im Professor-Snapshot keine Daten liefert.
 - **Stored Procedure / Function Naming:** MS4 verwendet UPPER_CASE (`SF_CK_VAT_PERIOD`, `SP_CREATE_VAT_STATEMENT`). HdM-Konvention ist KLEIN. → ADR-007, alle Namen refactored.

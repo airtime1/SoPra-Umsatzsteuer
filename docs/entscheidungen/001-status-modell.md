@@ -2,7 +2,7 @@
 
 - **Status:** akzeptiert
 - **Datum:** 2026-06-03
-- **Beteiligte:** Nils (vorgeschlagen), Team-Bestätigung steht aus
+- **Beteiligte:** Nils, Moritz, Abel
 
 ## Kontext
 
