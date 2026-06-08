@@ -6,3 +6,11 @@ Konvention:
 - Datei pro SPC-Kriterium oder pro Stored Object: `spc1_<beschreibung>.sql`, `fn_calculate_vat_balance_basic.sql`, …
 - Vor jedem Test: Sandbox in bekannten Zustand bringen (Seed + Cleanup).
 - Ein pytest-Wrapper in `tests/python/` ist geplant, aber noch nicht angelegt.
+
+Aktuelle Dateien:
+
+| Datei | Erwartung |
+|---|---|
+| `fn_calculate_vat_balance_basic.sql` | Sechs Ergebniszeilen, alle `PASS` |
+| `sp_create_vat_statement_demo.sql` | Drei Ergebniszeilen, alle `PASS` |
+| `sp_status_workflow_roles_demo.sql` | Fuenf Ergebniszeilen, alle `PASS` |

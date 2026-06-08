@@ -16,12 +16,14 @@ Format: `[Status] Frage — Adressat — Datum erstellt`. Status ∈ {OFFEN, GEK
 
 ## Schnittstellen zu anderen Gruppen
 
-Stand der aktuellen Repository-Dokumentation: Werte und Inhalt sind fachlich vorgeklaert, konkrete Schnittstellenfragen bleiben aber offen. `list_views.V_LIST_OUTPUT_VAT` berechnet die Ausgangssteuer aktuell aus `T_INVOICE_ITEM` und `T_MATERIAL.VAT`; offen bleiben dort Korrekturfelder. `list_views.V_LIST_INPUT_VAT` ist implementiert, lieferte im Professor-Snapshot laut PR #19 aber aktuell keine Daten. Wenn Schnittstellen finalisiert werden, sollen nur die Views angepasst werden; der Rest der Pipeline (`stored_proc.sp_create_vat_statement`, `stored_func.fn_*`) bleibt möglichst unverändert.
+Stand der aktuellen Repository-Dokumentation: Werte und Inhalt sind fachlich vorgeklaert, konkrete Schnittstellenfragen bleiben aber offen. Die lesende DEV-Pruefung am 2026-06-07 bestaetigte `T_INVOICE`, `T_INVOICE_ITEM`, `T_SUPPLIER_INVOICE`, `T_SUPPLIER_INVOICE_ITEM`, `T_PAYMENT_RECEIPT`, `T_CODE`, `T_CODE_NEXT` und `T_USER` als relevante Integrationsbereiche. Details stehen in `docs/schnittstellen_annahmen.md`. Wenn Schnittstellen finalisiert werden, sollen primaer die Views angepasst werden; der Rest der Pipeline (`stored_proc.sp_create_vat_statement`, `stored_func.fn_*`) bleibt möglichst unverändert.
 
 - [OFFEN] Gruppe 4 (Eingangsrechnungen): Exakte Spaltennamen für `TAX_AMOUNT` auf `T_SUPPLIER_INVOICE` (oder bleibt es bei Item-Aggregation aus `T_SUPPLIER_INVOICE_ITEM.UNIT_VAT_PCT`)?
+- [OFFEN] Gruppe 4 (Eingangsrechnungen): Finale Statuswerte fuer steuerlich relevante Vorsteuer bestaetigen; aktuell nutzt `V_LIST_INPUT_VAT` `AN BUCHHALTUNG UEBERMITTELT`.
 - [GEKLÄRT 2026-06-06] Gruppe 7 (Ausgangsrechnungen): `T_INVOICE` hat keine `TAX_AMOUNT`-Spalte; `list_views.V_LIST_OUTPUT_VAT` aggregiert über `T_INVOICE_ITEM` und `T_MATERIAL.VAT`.
 - [OFFEN] Gruppe 7 (Ausgangsrechnungen): Belastbare Schnittstelle für `IS_CORRECTION` und `ORIGINAL_INVOICE_ID`.
-- [OFFEN] Gruppe 8 (Zahlungen / Skonto): Skonto als eigene Korrektur-Rechnung oder Mutation der Ursprungsrechnung?
+- [OFFEN] Gruppe 8 (Zahlungen / Skonto): Skonto als eigene Korrektur-Rechnung, Zahlungskorrektur in `T_PAYMENT_RECEIPT` oder Mutation der Ursprungsrechnung?
+- [OFFEN] Gruppe 8 (Zahlungen / Skonto): Bedeutung von `DIFFERENCE_AMOUNT`, `SKONTO_BERECHTIGT_YN`, `STORNO_YN` und `STORNO_REFERENCE_ID` verbindlich klaeren; DEV-Spalten existieren, sind aber kaum gefuellt, bekannte Sandbox kann aelter sein.
 - [OFFEN] Gruppen 9/10 (Barrechnung Freiburg/Rosenberg): Eigene Tabelle oder Eintrag in `T_INVOICE`?
 - [OFFEN] Gruppe 19 (FiBu) ist unbesetzt — bestätigen, dass wir nur theoretisch ausgeben und keinen abnehmenden Konsumenten haben.
 
@@ -29,7 +31,7 @@ Stand der aktuellen Repository-Dokumentation: Werte und Inhalt sind fachlich vor
 
 - [OFFEN] Behandlung leerer Perioden (F17): erzeugen wir eine leere Abrechnung mit Hinweis, oder verweigern wir den Anlage-Versuch?
 - [OFFEN] Mehrere Steuersätze (Anforderung D): bauen wir vereinfacht mit 19% Fixwert, oder vorbereitend per Steuercode?
-- [OFFEN] Wer prüft die zeitliche Cut-off-Logik aus Sicht der Steuerlogik — ist das wirklich nur "Tag ≥ 10"? Was passiert mit Belegen, die nach dem 10. noch nachgeliefert werden?
+- [OFFEN] Wer prüft die zeitliche Cut-off-Logik aus Sicht der Steuerlogik — ist das wirklich nur "Tag ≥ 10"? Aktuelle Umsetzung: spaete Belege/Korrekturen fliessen ueber ihr eigenes Belegdatum in die naechste offene Periode und veraendern abgeschlossene Perioden nicht.
 
 ## Team-intern
 

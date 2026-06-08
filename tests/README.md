@@ -20,7 +20,15 @@ Dieser Ordner sammelt Testfall-Katalog, Abnahmekriterien und ausführbare SQL-Te
 
 ## Vorgehen für die Abnahme
 
-1. Saubere Sandbox aufsetzen (`scripts/deploy_sandbox.py`).
-2. Seed-Daten einspielen (`sql/99_seed/`).
-3. Testfälle aus `test_cases.md` durchgehen, Ergebnis dokumentieren.
-4. Abnahmekriterien mit Status `OFFEN`, `BESTANDEN` oder `FEHLER` dokumentieren.
+1. Saubere Sandbox aufsetzen (`scripts/deploy_sandbox.py`). Der Deploy spielt `sql/99_seed/` mit ein.
+2. SQL-Tests aus `tests/sql/` ausführen und prüfen, dass jede Ergebniszeile `PASS` liefert.
+3. Streamlit mit `APP_DB_PROFILE=sandbox` starten und den Demo-Workflow in der UI durchgehen.
+4. Testfälle aus `test_cases.md` und Abnahmekriterien dokumentieren.
+
+## Aktuell ausführbare SQL-Tests
+
+| Datei | Deckt ab |
+|---|---|
+| `tests/sql/fn_calculate_vat_balance_basic.sql` | Saldo- und Typberechnung (`ZAHLLAST`, `UEBERHANG`, `NEUTRAL`) |
+| `tests/sql/sp_create_vat_statement_demo.sql` | Anlage einer Demo-Abrechnung, vollständige Belegübernahme, optionale Skonto-/Schnittstellenprüfung |
+| `tests/sql/sp_status_workflow_roles_demo.sql` | Rollenchecks, Freigabe, Zahlung und Sperre einer bezahlten Periode |

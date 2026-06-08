@@ -32,8 +32,7 @@ class VatStatement:
 
 
 def list_statements() -> pd.DataFrame:
-    """Alle Abrechnungen — direkt aus dbo.T_VAT_STATEMENT, bis es eine
-    list_views.V_LIST_VAT_STATEMENT gibt."""
+    """Alle Abrechnungen aus der Anzeige-View."""
     sql = """
         SELECT VAT_STATEMENT_ID, VAT_PERIOD, VAT_STATUS,
                OUTPUT_VAT_TOTAL, INPUT_VAT_TOTAL,
@@ -41,7 +40,7 @@ def list_statements() -> pd.DataFrame:
                CREATED_BY, CREATED_AT,
                APPROVED_BY, APPROVED_AT,
                CLOSED_BY, CLOSED_AT
-        FROM dbo.T_VAT_STATEMENT
+        FROM list_views.V_LIST_VAT_STATEMENT
         ORDER BY VAT_PERIOD DESC
     """
     with get_active_conn() as conn:
@@ -54,12 +53,24 @@ def get_statement_items(statement_id: int) -> pd.DataFrame:
                SOURCE_INVOICE_DATE, TAX_AMOUNT,
                IS_CORRECTION, ORIGINAL_INVOICE_ID,
                CREATED_BY, CREATED_AT
-        FROM dbo.T_VAT_STATEMENT_ITEM
+        FROM list_views.V_LIST_VAT_STATEMENT_ITEM
         WHERE VAT_STATEMENT_ID = ?
-        ORDER BY SOURCE_TABLE, SOURCE_INVOICE_DATE
+        ORDER BY SOURCE_INVOICE_DATE, SOURCE_TABLE, SOURCE_INVOICE_ID
     """
     with get_active_conn() as conn:
         return pd.read_sql(sql, conn, params=[statement_id])
+
+
+def list_users() -> pd.DataFrame:
+    """Benutzer fuer Demo-/Rollensteuerung ohne Passwortdaten."""
+    sql = """
+        SELECT USERNAME, SECURITYLEVEL, VAT_ROLE
+        FROM list_views.V_LIST_VAT_USER
+        WHERE SECURITYLEVEL IN (1, 2, 3)
+        ORDER BY SECURITYLEVEL, USERNAME
+    """
+    with get_active_conn() as conn:
+        return pd.read_sql(sql, conn)
 
 
 def create_statement(period: str, created_by: str) -> int:

@@ -1,8 +1,9 @@
 """
-Datenbank-Wrapper. Liest Credentials aus .env und stellt zwei Connections bereit:
+Datenbank-Wrapper. Liest Credentials aus .env und stellt drei Connections bereit:
 
 - get_app_conn():     ueber ERP_REMOTE_USER (read/write/execute). Fuer das laufende UI.
-- get_dev_conn():     persoenlicher User auf ERPDEV26S oder Sandbox. Nur fuer Deploy-Skripte.
+- get_dev_conn():     persoenlicher User auf ERPDEV26S. Nur fuer Analyse/Deploy-Skripte.
+- get_sandbox_conn(): eigene Sandbox. Fuer lokale Deploys und Tests.
 
 Alle Aufrufe an Stored Procedures / Functions laufen ueber kleine Helper, damit die UI nicht
 direkt mit pyodbc-Cursor-Code hantieren muss.

@@ -7,8 +7,9 @@
 --   1. fn_check_vat_period pruefen.
 --   2. Vorhandener DRAFT -> Items loeschen, Kopf zuruecksetzen.
 --      Sonst Kopf neu anlegen.
---   3. Items aus list_views.V_LIST_OUTPUT_VAT (USt) und
---      list_views.V_LIST_INPUT_VAT (VSt) einlesen, gefiltert auf
+--   3. Items aus list_views.V_LIST_OUTPUT_VAT (USt inkl. Skonto-
+--      Korrekturen) und list_views.V_LIST_INPUT_VAT (VSt) einlesen,
+--      gefiltert auf
 --      den Abrechnungsmonat.
 --   4. Summen + fn_calculate_vat_balance -> Kopf aktualisieren.
 --   5. VAT_STATEMENT_ID zurueckgeben.
@@ -38,6 +39,19 @@ BEGIN
     DECLARE @statement_id INT;
     DECLARE @period_start DATE = CAST(@vat_period + '-01' AS DATE);
     DECLARE @period_end   DATE = EOMONTH(@period_start);
+    DECLARE @creator_security_level INT = stored_func.fn_get_user_security_level(@created_by);
+
+    IF @creator_security_level IS NULL
+    BEGIN
+        THROW 50020, 'Unbekannter Benutzer fuer Umsatzsteuerabrechnung.', 1;
+        RETURN;
+    END
+
+    IF @creator_security_level <> 1
+    BEGIN
+        THROW 50021, 'Benutzer hat nicht die benoetigte Rolle fuer diese Aktion.', 1;
+        RETURN;
+    END
 
     BEGIN TRY
         BEGIN TRANSACTION;
@@ -78,13 +92,13 @@ BEGIN
              SOURCE_INVOICE_DATE, TAX_AMOUNT, IS_CORRECTION,
              ORIGINAL_INVOICE_ID, CREATED_BY)
         SELECT
-            @statement_id, 'T_INVOICE', INVOICE_ID,
-            INVOICE_DATE, TAX_AMOUNT,
+            @statement_id, SOURCE_TABLE, SOURCE_INVOICE_ID,
+            SOURCE_INVOICE_DATE, TAX_AMOUNT,
             ISNULL(IS_CORRECTION, 0),
             ORIGINAL_INVOICE_ID,
             @created_by
         FROM list_views.V_LIST_OUTPUT_VAT
-        WHERE INVOICE_DATE BETWEEN @period_start AND @period_end;
+        WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end;
 
         -- 3) Items: Vorsteuer (Eingangsrechnungen)
         INSERT INTO dbo.T_VAT_STATEMENT_ITEM
@@ -92,13 +106,13 @@ BEGIN
              SOURCE_INVOICE_DATE, TAX_AMOUNT, IS_CORRECTION,
              ORIGINAL_INVOICE_ID, CREATED_BY)
         SELECT
-            @statement_id, 'T_SUPPLIER_INVOICE', INVOICE_ID,
-            INVOICE_DATE, TAX_AMOUNT,
-            0,            -- Korrekturen aus T_SUPPLIER_INVOICE: Klaerung Gruppe 4
-            NULL,
+            @statement_id, SOURCE_TABLE, SOURCE_INVOICE_ID,
+            SOURCE_INVOICE_DATE, TAX_AMOUNT,
+            ISNULL(IS_CORRECTION, 0),
+            ORIGINAL_INVOICE_ID,
             @created_by
         FROM list_views.V_LIST_INPUT_VAT
-        WHERE INVOICE_DATE BETWEEN @period_start AND @period_end;
+        WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end;
 
         -- 4) Summen + Saldo
         DECLARE @output_sum DECIMAL(12,2);
@@ -107,7 +121,7 @@ BEGIN
         SELECT @output_sum = ISNULL(SUM(TAX_AMOUNT), 0)
         FROM dbo.T_VAT_STATEMENT_ITEM
         WHERE VAT_STATEMENT_ID = @statement_id
-          AND SOURCE_TABLE = 'T_INVOICE';
+          AND SOURCE_TABLE IN ('T_INVOICE', 'T_PAYMENT_RECEIPT');
 
         SELECT @input_sum = ISNULL(SUM(TAX_AMOUNT), 0)
         FROM dbo.T_VAT_STATEMENT_ITEM
