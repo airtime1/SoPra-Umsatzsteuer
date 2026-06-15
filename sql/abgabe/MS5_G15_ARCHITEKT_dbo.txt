@@ -1,0 +1,253 @@
+-- ============================================================================
+-- MS5 Abgabe — Gruppe 15 — Architekten-Anteil (dbo)
+-- Stand: 2026-06-13
+-- ============================================================================
+-- Dieses Skript enthaelt ausschliesslich die Objekte, die im dbo-Schema
+-- liegen und die Gruppe 15 nicht selbst gegen ERPDEV26S anlegen darf.
+-- Bitte vom Datenbank-Architekten gegen ERPDEV26S ausfuehren.
+--
+-- INHALT:
+--   1) dbo.T_CODE / dbo.T_CODE_NEXT — VAT_STATUS-Eintraege
+--   2) dbo.T_VAT_STATEMENT          — Abrechnungskopf
+--   3) dbo.T_VAT_STATEMENT_ITEM     — Beleg-Items
+--
+-- ID-Bereich VAT_STATUS: 9001..9003 (Platzhalter, bitte ggf. anpassen).
+--
+-- IDEMPOTENZ:
+--   - INSERTs:    IF NOT EXISTS gesichert
+--   - CREATE TABLE: IF OBJECT_ID IS NULL gesichert
+-- ============================================================================
+
+
+
+-- ============================================================================
+-- 1) dbo.T_CODE / dbo.T_CODE_NEXT — VAT_STATUS-Codes und Statusfolgen
+-- ============================================================================
+
+IF NOT EXISTS (
+    SELECT 1 FROM dbo.T_CODE WHERE CODE_TYPE = 'VAT_STATUS' AND CODE_NAME = 'DRAFT'
+)
+BEGIN
+    INSERT INTO dbo.T_CODE (ID_CODE, CODE_TYPE, CODE_NAME)
+    VALUES (9001, 'VAT_STATUS', 'DRAFT');
+END;
+
+IF NOT EXISTS (
+    SELECT 1 FROM dbo.T_CODE WHERE CODE_TYPE = 'VAT_STATUS' AND CODE_NAME = 'APPROVED'
+)
+BEGIN
+    INSERT INTO dbo.T_CODE (ID_CODE, CODE_TYPE, CODE_NAME)
+    VALUES (9002, 'VAT_STATUS', 'APPROVED');
+END;
+
+IF NOT EXISTS (
+    SELECT 1 FROM dbo.T_CODE WHERE CODE_TYPE = 'VAT_STATUS' AND CODE_NAME = 'PAID'
+)
+BEGIN
+    INSERT INTO dbo.T_CODE (ID_CODE, CODE_TYPE, CODE_NAME)
+    VALUES (9003, 'VAT_STATUS', 'PAID');
+END;
+GO
+
+DECLARE @draft_status_id    INT = (SELECT ID_CODE FROM dbo.T_CODE WHERE CODE_TYPE = 'VAT_STATUS' AND CODE_NAME = 'DRAFT');
+DECLARE @approved_status_id INT = (SELECT ID_CODE FROM dbo.T_CODE WHERE CODE_TYPE = 'VAT_STATUS' AND CODE_NAME = 'APPROVED');
+DECLARE @paid_status_id     INT = (SELECT ID_CODE FROM dbo.T_CODE WHERE CODE_TYPE = 'VAT_STATUS' AND CODE_NAME = 'PAID');
+
+IF @draft_status_id IS NULL OR @approved_status_id IS NULL OR @paid_status_id IS NULL
+BEGIN
+    THROW 50030, 'VAT_STATUS-Codewerte konnten nicht ermittelt werden.', 1;
+END;
+
+IF NOT EXISTS (
+    SELECT 1 FROM dbo.T_CODE_NEXT
+    WHERE CODE_TYPE = 'VAT_STATUS'
+      AND CODE_ID = @draft_status_id
+      AND CODE_NEXT_ID = @approved_status_id
+)
+BEGIN
+    INSERT INTO dbo.T_CODE_NEXT (CODE_TYPE, CODE_ID, CODE_NEXT_ID, SECURITY_LEVEL)
+    VALUES ('VAT_STATUS', @draft_status_id, @approved_status_id, 3);
+END;
+
+IF NOT EXISTS (
+    SELECT 1 FROM dbo.T_CODE_NEXT
+    WHERE CODE_TYPE = 'VAT_STATUS'
+      AND CODE_ID = @approved_status_id
+      AND CODE_NEXT_ID = @paid_status_id
+)
+BEGIN
+    INSERT INTO dbo.T_CODE_NEXT (CODE_TYPE, CODE_ID, CODE_NEXT_ID, SECURITY_LEVEL)
+    VALUES ('VAT_STATUS', @approved_status_id, @paid_status_id, 2);
+END;
+
+IF NOT EXISTS (
+    SELECT 1 FROM dbo.T_CODE_NEXT
+    WHERE CODE_TYPE = 'VAT_STATUS'
+      AND CODE_ID = @approved_status_id
+      AND CODE_NEXT_ID = @draft_status_id
+)
+BEGIN
+    INSERT INTO dbo.T_CODE_NEXT (CODE_TYPE, CODE_ID, CODE_NEXT_ID, SECURITY_LEVEL)
+    VALUES ('VAT_STATUS', @approved_status_id, @draft_status_id, 3);
+END;
+GO
+
+
+
+-- ============================================================================
+-- 2) dbo.T_VAT_STATEMENT — Kopf einer monatlichen Umsatzsteuerabrechnung
+-- ============================================================================
+
+IF OBJECT_ID('dbo.T_VAT_STATEMENT', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_VAT_STATEMENT (
+        VAT_STATEMENT_ID    INT IDENTITY(1,1) PRIMARY KEY,
+        VAT_PERIOD          CHAR(7) NOT NULL,                  -- Format YYYY-MM
+        VAT_STATUS          VARCHAR(20) NOT NULL,              -- DRAFT, APPROVED, PAID
+        OUTPUT_VAT_TOTAL    DECIMAL(12,2) NOT NULL DEFAULT 0,
+        INPUT_VAT_TOTAL     DECIMAL(12,2) NOT NULL DEFAULT 0,
+        VAT_BALANCE         DECIMAL(12,2) NOT NULL DEFAULT 0,
+        VAT_TYPE            VARCHAR(20) NULL,                  -- ZAHLLAST, UEBERHANG, NEUTRAL
+
+        CREATED_BY          VARCHAR(50) NOT NULL,
+        CREATED_AT          DATETIME    NOT NULL DEFAULT GETDATE(),
+        APPROVED_BY         VARCHAR(50) NULL,
+        APPROVED_AT         DATETIME    NULL,
+        CLOSED_BY           VARCHAR(50) NULL,
+        CLOSED_AT           DATETIME    NULL,
+
+        CONSTRAINT CHK_VAT_STATEMENT_PERIOD
+            CHECK (
+                VAT_PERIOD LIKE '[0-9][0-9][0-9][0-9]-[0-1][0-9]'
+                AND RIGHT(VAT_PERIOD, 2) BETWEEN '01' AND '12'
+            ),
+
+        CONSTRAINT UQ_VAT_STATEMENT_PERIOD
+            UNIQUE (VAT_PERIOD),
+
+        CONSTRAINT CHK_VAT_STATEMENT_STATUS
+            CHECK (VAT_STATUS IN ('DRAFT', 'APPROVED', 'PAID')),
+
+        CONSTRAINT CHK_VAT_STATEMENT_BALANCE_NONNEG
+            CHECK (VAT_BALANCE >= 0),
+
+        CONSTRAINT CHK_VAT_STATEMENT_TYPE
+            CHECK (VAT_TYPE IN ('ZAHLLAST', 'UEBERHANG', 'NEUTRAL') OR VAT_TYPE IS NULL),
+
+        CONSTRAINT CHK_VAT_STATEMENT_APPROVED_FIELDS
+            CHECK (
+                (VAT_STATUS IN ('APPROVED', 'PAID') AND APPROVED_BY IS NOT NULL AND APPROVED_AT IS NOT NULL)
+                OR VAT_STATUS = 'DRAFT'
+            ),
+
+        CONSTRAINT CHK_VAT_STATEMENT_CLOSED_FIELDS
+            CHECK (
+                (VAT_STATUS = 'PAID' AND CLOSED_BY IS NOT NULL AND CLOSED_AT IS NOT NULL)
+                OR VAT_STATUS IN ('DRAFT', 'APPROVED')
+            )
+    );
+END;
+GO
+
+
+
+-- ============================================================================
+-- 3) dbo.T_VAT_STATEMENT_ITEM — Detailzeilen einer Abrechnung
+-- ============================================================================
+
+IF OBJECT_ID('dbo.T_VAT_STATEMENT_ITEM', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.T_VAT_STATEMENT_ITEM (
+        VAT_STATEMENT_ITEM_ID   INT IDENTITY(1,1) PRIMARY KEY,
+        VAT_STATEMENT_ID        INT NOT NULL,
+        SOURCE_TABLE            VARCHAR(50) NOT NULL,
+        SOURCE_INVOICE_ID       INT NOT NULL,
+        SOURCE_INVOICE_DATE     DATE NOT NULL,
+        TAX_AMOUNT              DECIMAL(12,2) NOT NULL,
+        IS_CORRECTION           BIT NOT NULL DEFAULT 0,
+        ORIGINAL_INVOICE_ID     INT NULL,
+        CREATED_BY              VARCHAR(50) NOT NULL,
+        CREATED_AT              DATETIME    NOT NULL DEFAULT GETDATE(),
+
+        CONSTRAINT FK_VAT_ITEM_STATEMENT
+            FOREIGN KEY (VAT_STATEMENT_ID)
+            REFERENCES dbo.T_VAT_STATEMENT (VAT_STATEMENT_ID),
+
+        CONSTRAINT CHK_VAT_ITEM_SOURCE_TABLE
+            CHECK (SOURCE_TABLE IN ('T_INVOICE', 'T_SUPPLIER_INVOICE', 'T_PAYMENT_RECEIPT')),
+
+        CONSTRAINT CHK_VAT_ITEM_CORRECTION_HAS_ORIGINAL
+            CHECK (IS_CORRECTION = 0 OR ORIGINAL_INVOICE_ID IS NOT NULL),
+
+        CONSTRAINT UQ_VAT_ITEM_PER_STATEMENT
+            UNIQUE (VAT_STATEMENT_ID, SOURCE_TABLE, SOURCE_INVOICE_ID, IS_CORRECTION)
+    );
+
+    CREATE INDEX IX_VAT_ITEM_STATEMENT
+        ON dbo.T_VAT_STATEMENT_ITEM (VAT_STATEMENT_ID);
+
+    CREATE INDEX IX_VAT_ITEM_SOURCE
+        ON dbo.T_VAT_STATEMENT_ITEM (SOURCE_TABLE, SOURCE_INVOICE_ID);
+END;
+GO
+
+
+
+-- ============================================================================
+-- 4) Nachzieh-Constraints fuer bestehende Sandbox-Installationen
+-- ----------------------------------------------------------------------------
+-- Wirkt nur, wenn die Tabellen oben bereits aus aelterem Deploy existieren
+-- und der CREATE-Block deshalb uebersprungen wurde. Auf frischen
+-- Installationen ist dieser Block ein No-op.
+-- ============================================================================
+
+IF OBJECT_ID('dbo.T_VAT_STATEMENT', 'U') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM sys.check_constraints
+        WHERE name = 'CHK_VAT_STATEMENT_PERIOD'
+          AND parent_object_id = OBJECT_ID('dbo.T_VAT_STATEMENT')
+    )
+    BEGIN
+        ALTER TABLE dbo.T_VAT_STATEMENT
+            DROP CONSTRAINT CHK_VAT_STATEMENT_PERIOD;
+    END;
+
+    ALTER TABLE dbo.T_VAT_STATEMENT
+        ADD CONSTRAINT CHK_VAT_STATEMENT_PERIOD
+        CHECK (
+            VAT_PERIOD LIKE '[0-9][0-9][0-9][0-9]-[0-1][0-9]'
+            AND RIGHT(VAT_PERIOD, 2) BETWEEN '01' AND '12'
+        );
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.key_constraints
+        WHERE name = 'UQ_VAT_STATEMENT_PERIOD'
+          AND parent_object_id = OBJECT_ID('dbo.T_VAT_STATEMENT')
+    )
+    BEGIN
+        ALTER TABLE dbo.T_VAT_STATEMENT
+            ADD CONSTRAINT UQ_VAT_STATEMENT_PERIOD UNIQUE (VAT_PERIOD);
+    END;
+END;
+GO
+
+IF OBJECT_ID('dbo.T_VAT_STATEMENT_ITEM', 'U') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM sys.check_constraints
+        WHERE name = 'CHK_VAT_ITEM_SOURCE_TABLE'
+          AND parent_object_id = OBJECT_ID('dbo.T_VAT_STATEMENT_ITEM')
+    )
+    BEGIN
+        ALTER TABLE dbo.T_VAT_STATEMENT_ITEM
+            DROP CONSTRAINT CHK_VAT_ITEM_SOURCE_TABLE;
+    END;
+
+    ALTER TABLE dbo.T_VAT_STATEMENT_ITEM
+        ADD CONSTRAINT CHK_VAT_ITEM_SOURCE_TABLE
+        CHECK (SOURCE_TABLE IN ('T_INVOICE', 'T_SUPPLIER_INVOICE', 'T_PAYMENT_RECEIPT'));
+END;
+GO
+
+-- Ende.
