@@ -82,5 +82,14 @@ Block durch den im Kommentar bereitgestellten echten SELECT ersetzt.
   `TAX_CORRECTION_AMOUNT` (Steueranteil der Skonto-Korrektur, positiv)
   ergaenzen.
 - **Architekt** (Lehmann) muss
-  `MS5_G15_ARCHITEKT_dbo.sql` ausfuehren: T_CODE-Eintraege fuer VAT_STATUS
-  und die Tabellen T_VAT_STATEMENT / T_VAT_STATEMENT_ITEM.
+  `MS5_G15_ARCHITEKT_dbo.sql` ausfuehren: T_CODE-Eintraege fuer VAT_STATUS,
+  T_CODE_NEXT-Eintraege fuer die Uebergaenge und die Tabellen
+  T_VAT_STATEMENT / T_VAT_STATEMENT_ITEM.
+
+## Abhaengigkeit auf zentrale Architekten-Objekte
+
+Die Status-Procedures rufen die zentrale Function
+`dbo.fn_chk_status_folge(@status_alt, @status_neu)` auf, um Statusuebergaenge
+gegen `dbo.T_CODE_NEXT` zu pruefen (siehe ADR-009). Diese Function ist in
+ERPDEV26S vorhanden. In der lokalen Sandbox fehlt sie; ein vollstaendiger
+Status-Workflow-Test ist daher nur gegen ERPDEV26S moeglich.
