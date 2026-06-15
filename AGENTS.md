@@ -82,8 +82,8 @@ Wichtige eigene Objekte:
 | `dbo.T_VAT_STATEMENT` | Kopf einer monatlichen Umsatzsteuerabrechnung |
 | `dbo.T_VAT_STATEMENT_ITEM` | Detailzeilen mit einzelnen Steuerfaellen |
 | `list_views.LOV_VAT_STATUS` | Werteliste fuer `DRAFT`, `APPROVED`, `PAID` |
-| `list_views.V_LIST_OUTPUT_VAT` | Ausgangsrechnungen / Umsatzsteuer aus Gruppe 7; Steuerbetrag itembasiert aggregiert, optional mit Skonto-/Zahlungskorrekturen aus `T_PAYMENT_RECEIPT` |
-| `list_views.V_LIST_INPUT_VAT` | Eingangsrechnungen / Vorsteuer aus Gruppe 4; Steuerbetrag aus Supplier-Invoice-Items aggregiert |
+| `list_views.V_LIST_OUTPUT_VAT` | Umsatzsteuer als `UNION ALL` aus G7/G9/G10 (Ausgangsrechnungen) plus Skonto-Korrekturen aus G8; konsumiert `TAX_AMOUNT`/`TAX_CORRECTION_AMOUNT` direkt aus Partner-Lese-Views, keine Eigenberechnung (ADR-008) |
+| `list_views.V_LIST_INPUT_VAT` | Vorsteuer aus G4 (Wareneingaenge); konsumiert `TAX_AMOUNT` direkt aus der Partner-Lese-View, keine Eigenberechnung (ADR-008) |
 | `list_views.V_LIST_VAT_STATEMENT` | Anzeige-View fuer Abrechnungskopf |
 | `list_views.V_LIST_VAT_STATEMENT_ITEM` | Anzeige-View fuer Abrechnungspositionen |
 | `list_views.V_LIST_VAT_USER` | Minimale User-/Rollen-View ohne Passwortdaten |
@@ -95,8 +95,12 @@ Wichtige eigene Objekte:
 | `stored_proc.sp_pay_vat_statement` | Statuswechsel `APPROVED` -> `PAID` |
 | `stored_proc.sp_reject_vat_statement` | Rueckgabe `APPROVED` -> `DRAFT` |
 
+Datenquellen (5 Partner, 3 Kategorien): Umsatzsteuer aus G7 (Fernabsatz), G9 (Bar Rosenberg), G10 (Bar Freiburg); Vorsteuer aus G4 (Wareneingaenge); Umsatzsteuer-Korrektur (Skonto) aus G8 (Zahlungseingaenge). Wir lesen je `RechnungsID`, `RechnungsDatum`, `Steuerbetrag` bzw. `Steuerkorrekturbetrag` direkt aus den Partner-Lese-Views. Details und aktueller Lieferstand: `docs/zielbild.md`, `docs/schnittstellen_annahmen.md`.
+
 Verbindliche DB-Regeln:
-- `dbo` nicht direkt veraendern; Skripte fuer Tabellen und `T_CODE` an den Architekten liefern.
+- `dbo` nicht direkt veraendern; Skripte fuer Tabellen und `T_CODE`/`T_CODE_NEXT` an den Architekten liefern (`sql/abgabe/MS5_G15_ARCHITEKT_dbo.sql`).
+- Keine eigene Steuerberechnung: Steuerbetraege kommen fertig aus den Partner-Views, fehlende Felder/Views sind Bring-Schuld der Partner (ADR-008). Noch nicht gelieferte Quellen laufen als Stub (`WHERE 1 = 0`).
+- Statusuebergaenge pruefen die Status-Procedures ueber die zentrale Architekten-Function `dbo.fn_chk_status_folge` (liest `dbo.T_CODE_NEXT`, ADR-009); die Rolle bleibt eigene Pruefung.
 - Geschaeftslogik liegt moeglichst in Stored Functions/Procedures, nicht im Frontend.
 - HdM-Namenskonventionen strikt einhalten: Tabellen und Tabellenspalten UPPER_CASE, Procedures/Functions klein mit `sp_`/`fn_`, Views mit `LOV_`, `V_LIST_`, `V_INS_`, `V_UPD_`.
 - `VAT_BALANCE` ist immer ein nicht-negativer Absolutbetrag; `VAT_TYPE` unterscheidet `ZAHLLAST`, `UEBERHANG`, `NEUTRAL`.
@@ -150,19 +154,20 @@ Die ADRs in `docs/entscheidungen/` dokumentieren den aktuellen Entscheidungsstan
 | 005 | Korrekturen als eigene Item-Zeilen |
 | 006 | Frontend vorerst Python/Streamlit/pyodbc, Logik bleibt DB-nah wegen moeglichem phpRunner-Wechsel |
 | 007 | HdM-Namenskonventionen und Dev-DB-Befunde sind massgeblich |
+| 008 | Keine eigene Steuerberechnung; Partner-Lese-Views konsumieren; Stub-Pattern fuer fehlende Quellen |
+| 009 | Status-Procedures nutzen zentrale `dbo.fn_chk_status_folge` fuer Uebergangspruefung |
 
 Aus der Git-Historie dauerhaft relevant:
 - PR #17 bereinigte alte Grossschreibungs-Referenzen auf Function-/Procedure-Namen. Neue Doku darf nicht mehr `SF_*`/`SP_*` als aktuelle Objektnamen verwenden, ausser beim historischen MS4-Mapping.
 - PR #18 fuegte `ONBOARDING.md` als Setup-Leitfaden fuer neue Team-Mitglieder hinzu.
-- PR #19 fuegte `APP_DB_PROFILE` fuer umschaltbare App-Verbindungen (`app`, `dev`, `sandbox`) hinzu, stabilisierte Streamlit-Page-Imports, stellte die App-Services auf `get_active_conn()` um und korrigierte `list_views.V_LIST_OUTPUT_VAT` auf echte Aggregation aus `T_INVOICE_ITEM` und `T_MATERIAL.VAT`.
+- PR #19 fuegte `APP_DB_PROFILE` fuer umschaltbare App-Verbindungen (`app`, `dev`, `sandbox`) hinzu, stabilisierte Streamlit-Page-Imports und stellte die App-Services auf `get_active_conn()` um. (Die damalige Item-Aggregation in `V_LIST_OUTPUT_VAT` wurde mit ADR-008 durch direkten Konsum der Partner-Lese-Views ersetzt.)
 - Der Team-Repo-Workflow mit GitHub-Issues, PR-Template und Issue-Templates wurde in `CONTRIBUTING.md` etabliert.
 - Die HdM-Namenskonventionen und Dev-DB-Befunde wurden in ADR-007, `docs/namenskonventionen/INDEX.md`, SQL-Kommentaren und `docs/offene_fragen.md` eingearbeitet. Die lokale Dev-DB-Kopie selbst wird nicht committed.
 
 ## Bekannte Einschraenkungen und offene Punkte
 
-- Konkrete finale Schnittstellen-Spalten von Gruppe 4, Gruppe 7 und Gruppe 8 sind noch teilweise offen. `T_INVOICE` hat laut DEV-Befund keine fertige `TAX_AMOUNT`-Spalte; die Ausgangssteuer wird deshalb aktuell aus Items berechnet.
-- `list_views.V_LIST_OUTPUT_VAT` liefert je nach Ziel-DB-Schema Rechnungsteuer und optional Skonto-/Zahlungskorrekturen. In aelteren Sandbox-Staenden fehlen die Zahlungskorrekturspalten noch.
-- `list_views.V_LIST_INPUT_VAT` ist implementiert; DEV enthielt am 2026-06-07 aber keine Eingangsrechnungsdaten.
+- Partner-Lieferstand 2026-06-13 gegen ERPDEV26S: G7 (`V_LIST_G07_INVOICE`) aktiv, aber deutsche Spaltennamen (Mapping in unserer View). G9 (`V_LIST_G09_INVOICE_TAX_B2C`) ohne `TAX_AMOUNT`, G8 (`V_LIST_G08_PAYMENT_RECEIPT`) ohne `TAX_CORRECTION_AMOUNT`, G10 und G4 ohne View. Diese vier laufen als Stub; Bring-Schulden als Issues #24-#28 dokumentiert.
+- Status-Workflow haengt zur Laufzeit an `dbo.fn_chk_status_folge` (in ERPDEV vorhanden, in der lokalen Sandbox nicht). Vollstaendiger Workflow-Test nur gegen ERPDEV26S.
 - Rollenpruefungen in den Status-Procedures sind technisch umgesetzt, ersetzen aber keine echte Authentifizierung im Streamlit-Prototyp.
 - `ins_views`/`upd_views` sind als Ordner vorgesehen, aber aktuell nicht implementiert und moeglicherweise durch Stored Procedures ersetzbar.
 - Eine automatisierte pytest-Suite fehlt noch.
