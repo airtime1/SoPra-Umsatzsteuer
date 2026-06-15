@@ -1,63 +1,86 @@
 # Schnittstellen und Annahmen
 
-Stand: 2026-06-07
+Stand: 2026-06-13
 
-Dieses Dokument fasst die lesende Analyse der gemeinsamen DEV-Datenbank `ERPDEV26S` und die daraus abgeleiteten Annahmen fuer das Umsatzsteuer-Modul zusammen. Es enthaelt keine Credentials und keine Connection Strings.
+Dieses Dokument fasst die Annahmen ueber Partner-Schnittstellen und den
+Konsum-Mechanismus des Umsatzsteuer-Moduls zusammen. Es enthaelt keine
+Credentials und keine Connection Strings.
 
-## Gepruefte DEV-Bereiche
+## Konsum-Prinzip
 
-| Bereich | Befund | Nutzung im Modul |
+Gemaess ADR-008 berechnet Gruppe 15 keine Steuerbetraege selbst.
+Wir konsumieren die nach HdM-Konvention vereinbarten Spalten direkt aus
+den Partner-Lese-Views im Schema `list_views`.
+
+| Quell-Gruppe | Inhalt | Erwartete Partner-View | Erwartetes Feld |
+|---|---|---|---|
+| G4 — Wareneingaenge | Vorsteuer | `list_views.V_LIST_G04_SUPPLIER_INVOICE` | `TAX_AMOUNT` |
+| G7 — Rechnungen Fernabsatz | Umsatzsteuer | `list_views.V_LIST_G07_INVOICE` | `BetragUstEUR` (heutiger Name) |
+| G9 — Barrechnung Rosenberg | Umsatzsteuer | `list_views.V_LIST_G09_INVOICE_TAX_B2C` | `TAX_AMOUNT` |
+| G10 — Barrechnung Freiburg | Umsatzsteuer | `list_views.V_LIST_G10_INVOICE_*` (Name offen) | `TAX_AMOUNT` |
+| G8 — Zahlungseingang | Skonto-Korrektur | `list_views.V_LIST_G08_PAYMENT_RECEIPT` | `TAX_CORRECTION_AMOUNT` (positiv) |
+
+Steuerlich relevant ist das jeweilige Rechnungs- bzw. Belegdatum.
+Status-Filter werden nicht angewendet — die Partner-View ist verantwortlich
+dafuer, nur abgeschlossene und nicht stornierte Belege auszuliefern.
+
+## Aktueller Lieferstand der Partner (Diagnose 2026-06-13 gegen ERPDEV26S)
+
+| Partner | Status | Wirkung in unserem Bundle |
 |---|---|---|
-| `dbo.T_INVOICE` | Ausgangsrechnungskopf vorhanden; in DEV 155 Datensaetze; relevante Statuswerte u. a. `SEND TO CUSTOMER`, `OVERDUE`, `PAID`. | Quelle fuer steuerlich relevante Ausgangsrechnungen. |
-| `dbo.T_INVOICE_ITEM` | Detailpositionen vorhanden. DEV hat detaillierte Wertspalten; bekannte Sandbox kann aelter sein und nur Material/Menge enthalten. | Umsatzsteuer wird itembasiert berechnet, nicht aus einer Kopf-`TAX_AMOUNT`-Spalte. |
-| `dbo.T_MATERIAL` | Materialpreise und `VAT` vorhanden. | Fallback fuer aeltere Sandbox-Staende und fehlende Item-Steuerwerte. |
-| `dbo.T_SUPPLIER_INVOICE` | Eingangsrechnungskopf vorhanden; DEV aktuell ohne Daten. | Quelle fuer Vorsteuer, sobald Partnerdaten vorhanden sind. |
-| `dbo.T_SUPPLIER_INVOICE_ITEM` | Positionen mit Preis-/Mengen-/Steuersatzlogik vorhanden; `UNIT_NET_VALUE` kann berechnet oder als computed column vorhanden sein. | Vorsteuer wird aus Itemwerten und `UNIT_VAT_PCT` aggregiert. |
-| `dbo.T_PAYMENT_RECEIPT` | Zahlungseingaenge vorhanden; DEV hat Skonto-/Storno-nahe Spalten, diese sind aktuell aber praktisch nicht gefuellt. Bekannte Sandbox kann diese Spalten noch nicht haben. | Optionale Quelle fuer Skonto- und spaete Korrekturzeilen. |
-| `dbo.T_CODE` | Zentrale Status-/Code-Tabelle vorhanden. | Statusnamen fuer Rechnungen, Lieferantenrechnungen, Zahlungen und VAT-Status. |
-| `dbo.T_CODE_NEXT` | Statusfolge-Tabelle mit `SECURITY_LEVEL` vorhanden. | Rollencheck fuer VAT-Statuswechsel. |
-| `dbo.T_USER` | Benutzer mit `SECURITYLEVEL` vorhanden. | Demo-Rollen: 1 Sachbearbeiter, 2 Leitung FiBu, 3 CFO. |
-| `list_views.V_LIST_G07_INVOICE*` | Gruppen-Views vorhanden, liefern aber in Stichproben keine belastbaren Steuerbetraege. | Nicht primaere Quelle; direkte Tabellenaggregation ist derzeit plausibler. |
-| `list_views.V_LIST_G08_PAYMENT_*` | Zahlungsbezogene Views vorhanden. | Beobachtet, aber wegen unklarer Skonto-/Storno-Semantik nicht direkt als Hauptschnittstelle verwendet. |
+| G7 | View deployed, Spalten deutsch (`BetragUstEUR`, `RechnungsDatum`). | AKTIV in `V_LIST_OUTPUT_VAT`. Mapping deutsch -> englisch erfolgt im SELECT. |
+| G9 | View deployed (`V_LIST_G09_INVOICE_TAX_B2C`), `TAX_AMOUNT` fehlt. | STUB in `V_LIST_OUTPUT_VAT`. Aktivierung nach Lieferung. |
+| G10 | Keine `V_LIST_G10_*`-View vorhanden. | STUB in `V_LIST_OUTPUT_VAT`. Aktivierung nach Lieferung. |
+| G4 | Keine `V_LIST_G04_*`-View vorhanden. | STUB in `V_LIST_INPUT_VAT`. Aktivierung nach Lieferung. |
+| G8 | View deployed (`V_LIST_G08_PAYMENT_RECEIPT`), `TAX_CORRECTION_AMOUNT` fehlt. | STUB in `V_LIST_OUTPUT_VAT`. Aktivierung nach Lieferung. |
 
-## Aktuelle Schnittstellenentscheidung
+## Eigene Konsumenten-Views
 
-Die Umsatzsteuer-App konsumiert Partnerdaten nicht direkt im Frontend, sondern ueber eigene Lese-Views:
+- `list_views.V_LIST_OUTPUT_VAT` — Ausgangsrechnungen + Skonto-Korrekturen
+  als UNION ALL aus G7, G9, G10 und G8. Aktive und Stub-Quellen siehe oben.
+- `list_views.V_LIST_INPUT_VAT` — Vorsteuer aus G4 (aktuell Stub).
+- `list_views.V_LIST_VAT_STATEMENT`, `V_LIST_VAT_STATEMENT_ITEM` — Anzeige-
+  Views auf unsere eigenen Tabellen.
+- `list_views.V_LIST_VAT_USER` — Login + Rolle (kein Passwort).
 
-- `list_views.V_LIST_OUTPUT_VAT` vereinheitlicht Ausgangsrechnungen und optionale Zahlungskorrekturen.
-- `list_views.V_LIST_INPUT_VAT` vereinheitlicht Eingangsrechnungen/Vorsteuer.
-- `list_views.V_LIST_VAT_STATEMENT` und `list_views.V_LIST_VAT_STATEMENT_ITEM` kapseln eigene Abrechnungstabellen fuer die UI.
-- `list_views.V_LIST_VAT_USER` stellt nur Login, Security-Level und Demo-Rolle bereit; keine Passwortdaten.
+## Stub-Pattern (technisch)
 
-Diese Entscheidung reduziert Duplikation: Steuerrelevante Rechnungsdaten bleiben in den Partner-Modulen, die Umsatzsteuerabrechnung speichert nur den Abrechnungssnapshot.
+Ein Stub-Block hat dieselbe Spaltensignatur wie der spaetere echte SELECT,
+aber `WHERE 1 = 0`. Beispiel:
 
-## Annahmen fuer den aktuellen Stand
+```sql
+SELECT
+    CAST('T_INVOICE' AS VARCHAR(50))   AS SOURCE_TABLE,
+    CAST(NULL AS INT)                  AS SOURCE_INVOICE_ID,
+    CAST(NULL AS DATE)                 AS SOURCE_INVOICE_DATE,
+    CAST(NULL AS INT)                  AS INVOICE_ID,
+    CAST(NULL AS DATE)                 AS INVOICE_DATE,
+    CAST(NULL AS DECIMAL(12,2))        AS TAX_AMOUNT,
+    CAST(0 AS BIT)                     AS IS_CORRECTION,
+    CAST(NULL AS INT)                  AS ORIGINAL_INVOICE_ID
+WHERE 1 = 0
+```
 
-- Eine Ausgangsrechnung wird steuerlich beruecksichtigt, wenn ihr Statusname `SEND TO CUSTOMER`, `OVERDUE` oder `PAID` ist.
-- Eine Eingangsrechnung wird steuerlich beruecksichtigt, wenn ihr Statusname `AN BUCHHALTUNG UEBERMITTELT` ist.
-- Steuerbetraege werden aus Positionen berechnet, solange keine belastbare, zentrale Steuerbetragsspalte auf den Rechnungskopf-Tabellen existiert.
-- Negative Korrekturen aus Zahlungseingaengen sind nur dann aktiv, wenn die benoetigten `T_PAYMENT_RECEIPT`-Spalten im Zielsystem vorhanden und gepflegt sind.
-- Der Korrekturmonat ergibt sich aus dem Belegdatum der Korrektur (`SOURCE_INVOICE_DATE`), nicht aus dem Datum der Ursprungsrechnung.
-- Rollenpruefung erfolgt ueber `T_USER.SECURITYLEVEL`; die Streamlit-Auswahl ist nur Demo-Bedienung.
-- `dbo.T_VAT_STATEMENT` und `dbo.T_VAT_STATEMENT_ITEM` liegen fachlich in `dbo`, werden in der gemeinsamen DEV-DB aber nur ueber den Architekten angelegt.
+`CAST(NULL AS <Typ>)` fixiert den Datentyp jeder Spalte, damit das UNION ALL
+auch ohne echte Zeilen valide ist und die Folgeprozeduren die Signatur
+zuverlaessig erhalten. Der `WHERE 1 = 0`-Filter sorgt dafuer, dass der Stub
+in jeder Abrechnung null Zeilen beisteuert. Bei Aktivierung wird der Stub-
+Block durch den im Kommentar bereitgestellten echten SELECT ersetzt.
 
-## Offene Fragen an Partnergruppen / Dozent
+## Offene Punkte / Bring-Schulden
 
-- Gruppe 7: Welche finale Schnittstelle markiert Storno, Teilstorno, Gutschrift oder Korrekturrechnung fuer Ausgangsrechnungen?
-- Gruppe 7: Bleibt die Steuerberechnung dauerhaft itembasiert, oder kommt eine verbindliche Kopf-`TAX_AMOUNT`-Spalte?
-- Gruppe 4: Welche finalen Statuswerte bedeuten steuerlich "vorsteuerrelevant"?
-- Gruppe 4: Wird Vorsteuer dauerhaft aus `T_SUPPLIER_INVOICE_ITEM` berechnet oder als gepruefter Steuerbetrag geliefert?
-- Gruppe 8: Welche Semantik haben `DIFFERENCE_AMOUNT`, `SKONTO_BERECHTIGT_YN`, `STORNO_YN` und `STORNO_REFERENCE_ID` verbindlich?
-- Gruppe 8: Sollen Zahlungsdifferenzen netto/brutto geliefert werden, oder muessen wir den Steueranteil proportional aus der Rechnung ableiten?
-- Architekt/Dozent: Bestaetigung der `VAT_STATUS`-IDs 9001 bis 9003 oder Zuteilung finaler IDs im zentralen Codebereich.
-- Architekt/Dozent: Bestaetigung, ob `T_VAT_STATEMENT`-Schutz gegen direkte Updates ueber Rechte ausreicht oder ein eigener Trigger verlangt wird.
-
-## Uebergangsloesung
-
-Bis die Schnittstellen final sind, gilt:
-
-- Partnerdaten werden nur gelesen.
-- Unsere fachliche Logik haengt an den eigenen `list_views.V_LIST_*`-Views.
-- DEV-Analyse bleibt lesend; Testdaten werden nur in der Sandbox erzeugt.
-- Die Demo-Seed-Daten decken Ausgangsrechnungen, Eingangsrechnungen, Vorsteuerueberhang, Zahllast und optional Skonto-/Spaetkorrektur ab.
-- Wenn eine Ziel-DB die neueren Zahlungsspalten nicht hat, laufen Deployment und Tests weiterhin; der Skonto-Test erkennt diese Schnittstellenluecke als dokumentierten Uebergangszustand.
+- **G4** muss eine Lese-View `list_views.V_LIST_G04_SUPPLIER_INVOICE` mit
+  Spalten `INVOICE_ID, INVOICE_DATE, TAX_AMOUNT` (UPPER_SNAKE, HdM-Konvention)
+  bereitstellen.
+- **G7** sollte mittelfristig auf UPPER_SNAKE umstellen
+  (`RechnungsDatum -> INVOICE_DATE`, `BetragUstEUR -> TAX_AMOUNT`).
+  Solange wir mappen wir im SELECT.
+- **G9** muss in `V_LIST_G09_INVOICE_TAX_B2C` die Spalte `TAX_AMOUNT`
+  ergaenzen (kein Brutto, kein Anteil).
+- **G10** muss eine Lese-View bereitstellen, Name analog zu G9.
+- **G8** muss in `V_LIST_G08_PAYMENT_RECEIPT` die Spalte
+  `TAX_CORRECTION_AMOUNT` (Steueranteil der Skonto-Korrektur, positiv)
+  ergaenzen.
+- **Architekt** (Lehmann) muss
+  `MS5_G15_ARCHITEKT_dbo.sql` ausfuehren: T_CODE-Eintraege fuer VAT_STATUS
+  und die Tabellen T_VAT_STATEMENT / T_VAT_STATEMENT_ITEM.

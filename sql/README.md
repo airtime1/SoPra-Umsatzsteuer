@@ -12,14 +12,23 @@ Reihenfolge der Ausführung beim Aufbau einer leeren Sandbox:
 
 `99_devdb_kopie/` enthält die Referenz-DB-Kopie, die wir von der HdM bekommen — nicht selbst pflegen, nur als Lookup.
 
+`abgabe/` enthält gebündelte Einzel-SQL-Dateien für die MS5-Abgabe an zwei Ziele:
+
+- `abgabe/MS5_G15_Umsatzsteuerabrechnung.sql` — G15-Anteil: Schemas (`list_views`, `stored_func`, `stored_proc`), Views, Funcs, Procs. Idempotent, mehrfach ausführbar.
+- `abgabe/MS5_G15_ARCHITEKT_dbo.sql` — Architekten-Anteil: T_CODE-Einträge VAT_STATUS und Tabellen `T_VAT_STATEMENT` / `T_VAT_STATEMENT_ITEM`. Wird vom Datenbank-Architekten gegen `ERPDEV26S` ausgeführt, da `dbo` für uns gesperrt ist.
+
+Die Trennung in zwei Dateien bildet die Berechtigungs-Realität ab: G15 darf nur in eigene Schemata schreiben, der Architekt hält `dbo` exklusiv.
+
 ## Aktuelle Integrationslogik
 
-- `list_views.V_LIST_OUTPUT_VAT` liest Ausgangsrechnungen aus `T_INVOICE`/`T_INVOICE_ITEM` und berechnet Umsatzsteuer itembasiert. Wenn Zahlungskorrekturspalten in `T_PAYMENT_RECEIPT` vorhanden sind, liefert die View zusaetzlich negative Skonto-/Korrekturzeilen.
-- `list_views.V_LIST_INPUT_VAT` liest Eingangsrechnungen aus `T_SUPPLIER_INVOICE`/`T_SUPPLIER_INVOICE_ITEM` und berechnet Vorsteuer itembasiert.
-- `list_views.V_LIST_VAT_STATEMENT`, `list_views.V_LIST_VAT_STATEMENT_ITEM` und `list_views.V_LIST_VAT_USER` kapseln die eigenen Tabellen fuer die Streamlit-App.
-- `stored_func.fn_get_user_security_level` liest `T_USER.SECURITYLEVEL`; die Status-Procedures pruefen erlaubte Uebergaenge ueber `T_CODE_NEXT.SECURITY_LEVEL`.
+Gemäß ADR-008 berechnet G15 keine Steuerbeträge. Wir konsumieren TAX_AMOUNT bzw. TAX_CORRECTION_AMOUNT direkt aus Partner-Lese-Views:
 
-Die bekannte Sandbox und DEV koennen bei Partnergruppen-Spalten leicht auseinanderlaufen. Skripte mit dynamischer Schema-Pruefung sind deshalb bewusst idempotent und sollen nach finalen Schnittstellenentscheidungen wieder vereinfacht werden.
+- `list_views.V_LIST_OUTPUT_VAT` — UNION ALL aus G7 (Fernabsatz, aktiv), G9 (Bar Rosenberg, Stub), G10 (Bar Freiburg, Stub), G8 (Skonto-Korrektur, Stub).
+- `list_views.V_LIST_INPUT_VAT` — G4 (Wareneingänge, Stub).
+- `list_views.V_LIST_VAT_STATEMENT`, `list_views.V_LIST_VAT_STATEMENT_ITEM` und `list_views.V_LIST_VAT_USER` kapseln die eigenen Tabellen für die Streamlit-App.
+- `stored_func.fn_get_user_security_level` liest `T_USER.SECURITYLEVEL`; die Status-Procedures prüfen erlaubte Übergänge über `T_CODE_NEXT.SECURITY_LEVEL`.
+
+Stubs liefern Spalten mit korrekter Signatur, aber 0 Zeilen (`WHERE 1 = 0`). Aktivierung = auskommentierten Block in der View durch echten SELECT austauschen, siehe Kommentare in den View-Dateien.
 
 ## Namenskonventionen
 
