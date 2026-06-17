@@ -1,14 +1,13 @@
 -- ============================================================================
--- 1. Abgabe MS5 Gruppe 15 Umsatzsteuerabrechnung
--- Architektur-Aufbau
+-- 1.1 Abgabe MS5 Gruppe 15 Umsatzsteuerabrechnung
 -- ============================================================================
 -- INHALT:
---   1) dbo.T_CODE / dbo.T_CODE_NEXT — VAT_STATUS-Eintraege
+--   1) dbo.T_CODE / dbo.T_CODE_NEXT — VAT_STATUS-Eintraege (bereits ausgeführt und funktionsfähig)
 --   2) dbo.T_VAT_STATEMENT          — Abrechnungskopf
 --   3) dbo.T_VAT_STATEMENT_ITEM     — Beleg-Items
--- Hinweis (Stand 15.05.2026 13:48 Uhr): leider sind Stand jetzt nur ein kleiner Teil der vereinbarten, funktionsrelevanten  Parameter vorhanden, konkret fehlen die Steuerbeträge bei G4 & G9 und der Korrekturbetrag von G8
+-- Hinweis (Stand 17.06.2026): leider sind Stand jetzt nur ein  Teil der vereinbarten, funktionsrelevanten  Parameter vorhanden, konkret fehlen die Steuerbeträge bei G4, G9 & G10 sind noch nicht (wie geplant) über list_view_g07 verfügbar und für die Skonto-Korrektur von G8 fehlen noch: isSkonto (Y/N)
 
--- ID-Bereich VAT_STATUS: 9001..9003 (Platzhalter, muss ggf. angepasst werden).
+-- ID-Bereich VAT_STATUS: 9001..9003 (Platzhalter, kann ggf. angepasst werden).
 --
 -- eingebaute Idempotenz:
 --   - INSERTs:    IF NOT EXISTS gesichert
@@ -148,7 +147,7 @@ GO
 
 
 -- ============================================================================
--- 3) dbo.T_VAT_STATEMENT_ITEM — Detailzeilen einer Abrechnung
+-- 3) dbo.T_VAT_STATEMENT_ITEM — Detailzeilen (einzelne Rechnungen) einer Abrechnung
 -- ============================================================================
 
 IF OBJECT_ID('dbo.T_VAT_STATEMENT_ITEM', 'U') IS NULL
@@ -160,7 +159,7 @@ BEGIN
         SOURCE_INVOICE_ID       INT NOT NULL,
         SOURCE_INVOICE_DATE     DATE NOT NULL,
         TAX_AMOUNT              DECIMAL(12,2) NOT NULL,
-        IS_CORRECTION           BIT NOT NULL DEFAULT 0,
+        IS_CORRECTION           BIT NOT NULL DEFAULT 0,  --wird auf 1 gesetzt wenn skonto
         ORIGINAL_INVOICE_ID     INT NULL,
         CREATED_BY              VARCHAR(50) NOT NULL,
         CREATED_AT              DATETIME    NOT NULL DEFAULT GETDATE(),
@@ -192,8 +191,8 @@ GO
 -- ============================================================================
 -- 4) Nachzieh-Constraints für bestehende Sandbox-Installationen
 -- ----------------------------------------------------------------------------
--- Wirkt nur, wenn die Tabellen oben bereits aus aelterem Deploy existieren
--- und der CREATE-Block deshalb uebersprungen wurde. Auf frischen
+-- Wirkt nur, wenn die Tabellen oben bereits aus altem Deploy existieren
+-- und der CREATE-Block deshalb übersprungen wurde. Auf frischen
 -- Installationen ist dieser Block ein No-op.
 -- ============================================================================
 

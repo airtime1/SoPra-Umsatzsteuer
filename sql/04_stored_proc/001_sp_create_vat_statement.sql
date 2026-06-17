@@ -127,9 +127,9 @@ BEGIN
         -- Regel: bei Abrechnung der Periode sind alle Skonto-Zahlungen
         -- der enthaltenen Rechnungen bereits eingegangen.
         UPDATE itm
-        SET itm.TAX_AMOUNT          = sk.TAX_AMOUNT,
-            itm.IS_CORRECTION       = 1,
-            itm.ORIGINAL_INVOICE_ID = itm.SOURCE_INVOICE_ID
+        SET itm.TAX_AMOUNT          = sk.TAX_AMOUNT,        -- finaler Betrag von G8 ersetzt den Rechnungsbetrag
+            itm.IS_CORRECTION       = 1,                    -- markiert: hier hat Skonto gewirkt
+            itm.ORIGINAL_INVOICE_ID = itm.SOURCE_INVOICE_ID -- zeigt auf dieselbe Rechnung (erfuellt Constraint)
         FROM dbo.T_VAT_STATEMENT_ITEM itm
         JOIN list_views.V_LIST_VAT_SKONTO sk
           ON sk.INVOICE_ID = itm.SOURCE_INVOICE_ID
