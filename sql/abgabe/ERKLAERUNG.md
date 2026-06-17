@@ -1,6 +1,6 @@
 # Erklärung der MS5-Abgabe-Dateien
 
-Stand: 2026-06-15
+Stand: 2026-06-16
 
 Dieses Dokument erklärt die beiden Abgabe-Skripte Zeile für Zeile in einfacher Sprache, damit man sie versteht, kleine Teile sicher umbauen und dem Prüfer erklären kann. Es ist Lern- und Referenzmaterial, **keine** Upload-Datei (für den Google-Drive-Upload gelten die `.txt`-Versionen).
 
@@ -32,15 +32,15 @@ Dieses Dokument erklärt die beiden Abgabe-Skripte Zeile für Zeile in einfacher
 
 Wir berechnen keine Steuerbeträge selbst (ADR-008). Wir bekommen von jeder Quellgruppe nur wenige, fest vereinbarte Werte über deren Lese-View und verarbeiten sie.
 
-> **Hinweis/Rückfrage:** In der mündlichen Vereinbarung wurden „Gruppe 4, 7, 8 & 10" für `Steuerbetrag` genannt — das ist vermutlich ein Verschreiber für **4, 7, 9 & 10**, denn Gruppe 8 (Zahlungseingänge) liefert den **Korrekturbetrag**, nicht den normalen Steuerbetrag. Unten in der korrigierten Logik. Bitte kurz gegenprüfen.
+### Umsatzsteuer (Output) — eine Quelle für alle Verkaufskanäle
 
-### Umsatzsteuer (Output) — drei gleichwertige Verkaufskanäle
+Beschluss 2026-06-16: Alle Ausgangsrechnungen — Fernabsatz (G7) **und** die Barverkäufe von G9 (Rosenberg) und G10 (Freiburg) — laufen über dieselbe `dbo.T_INVOICE` und werden über **eine** Lese-View von G7 zugänglich gemacht. Wir lesen also nur noch eine Quelle.
 
 | Gruppe | Kanal | Erwartete View | Erwartetes Feld (Konvention) | Heute in ERPDEV | Issue |
 |---|---|---|---|---|---|
-| G7 | Rechnungen Fernabsatz | `list_views.V_LIST_G07_INVOICE` | `TAX_AMOUNT` | **da**, heißt aber `BetragUstEUR` | #25 |
-| G9 | Barrechnung Rosenberg | `list_views.V_LIST_G09_INVOICE_TAX_B2C` | `TAX_AMOUNT` | View da, Feld **fehlt** | #27 |
-| G10 | Barrechnung Freiburg | `list_views.V_LIST_G10_INVOICE_BAR_FREIBURG` (Name offen) | `TAX_AMOUNT` | View **fehlt** | #28 |
+| G7 | alle Ausgangsrechnungen | `list_views.V_LIST_G07_INVOICE` | `TAX_AMOUNT` | **da**, heißt aber `BetragUstEUR`; liefert aktuell nur Fernabsatz (B2C fehlt) | #25, #27, #28 |
+
+> **Offen (G7s Bring-Schuld):** `V_LIST_G07_INVOICE` ist über INNER JOINs auf die Fernabsatz-Kette (Angebot→Auftrag→Lieferung) gebaut. Bar-/B2C-Verkäufe ohne diese Kette fallen heraus — Diagnose 2026-06-16: nur 78 von 156 G9-Rechnungen sichtbar. G7 muss die View auf alle `T_INVOICE`-Rechnungen erweitern. Bis dahin zählt nur Fernabsatz; unsere Logik bleibt unverändert.
 
 ### Vorsteuer (Input)
 
@@ -48,15 +48,15 @@ Wir berechnen keine Steuerbeträge selbst (ADR-008). Wir bekommen von jeder Quel
 |---|---|---|---|---|---|
 | G4 | Wareneingänge | `list_views.V_LIST_G04_SUPPLIER_INVOICE` | `TAX_AMOUNT` | View **fehlt** | #24 |
 
-### Umsatzsteuer-Korrektur (Skonto)
+### Umsatzsteuer-Korrektur (Skonto) — Überschreiben statt Korrekturzeile
 
-| Gruppe | Bereich | Erwartete View | Erwartetes Feld | Heute in ERPDEV | Issue |
+| Gruppe | Bereich | Erwartete View | Erwartete Felder | Heute in ERPDEV | Issue |
 |---|---|---|---|---|---|
-| G8 | Zahlungseingänge | `list_views.V_LIST_G08_PAYMENT_RECEIPT` | `TAX_CORRECTION_AMOUNT` | View da, Feld **fehlt** | #26 |
+| G8 | Zahlungseingänge | `list_views.V_LIST_G08_PAYMENT_RECEIPT` | `INVOICE_ID`, finaler `TAX_AMOUNT`, `IS_SKONTO` (Y/N) | Felder **fehlen** | #26 |
 
-**Gemeinsame Felder bei allen:** zusätzlich zu `TAX_AMOUNT`/`TAX_CORRECTION_AMOUNT` immer `INVOICE_ID` (RechnungsID) und `INVOICE_DATE` (RechnungsDatum). Das Rechnungsdatum bestimmt, in welche Abrechnungsperiode der Beleg fällt.
+**Neues Skonto-Verfahren (ADR-010, löst ADR-005 ab):** G8 liefert je Zahlungseingang den **finalen** Steuerbetrag der Rechnung nach Skonto (nicht mehr einen separaten Korrekturbetrag). Wir erfassen erst alle Rechnungen normal und **überschreiben** dann bei `IS_SKONTO = 'Y'` den Steuerbetrag der passenden Rechnung (Match über `INVOICE_ID`). Es gibt keine eigene Minus-Korrekturzeile und kein `-1 * …` mehr.
 
-**Vorzeichen Korrektur:** G8 liefert den Korrekturbetrag positiv; wir drehen ihn in unserer View auf negativ (`-1 * …`), damit er die Umsatzsteuer mindert.
+**Gemeinsame Felder bei allen:** zusätzlich zu `TAX_AMOUNT` immer `INVOICE_ID` (RechnungsID) und `INVOICE_DATE` (RechnungsDatum). Das Rechnungsdatum bestimmt, in welche Abrechnungsperiode der Beleg fällt.
 
 ---
 
@@ -152,12 +152,12 @@ Eine Zeile = ein einzelner Steuerfall einer Abrechnung (eine Rechnung oder eine 
 
 | Spalte | Bedeutung |
 |---|---|
-| `SOURCE_TABLE` | fachliche Kategorie: `T_INVOICE` (Ausgang), `T_SUPPLIER_INVOICE` (Eingang), `T_PAYMENT_RECEIPT` (Korrektur) |
+| `SOURCE_TABLE` | fachliche Kategorie: `T_INVOICE` (Ausgang), `T_SUPPLIER_INVOICE` (Eingang). `T_PAYMENT_RECEIPT` ist weiterhin erlaubt, wird aber seit ADR-010 nicht mehr als eigene Zeile erzeugt |
 | `SOURCE_INVOICE_ID` | RechnungsID aus der Quelle |
 | `SOURCE_INVOICE_DATE` | Rechnungsdatum (steuert die Periode) |
-| `TAX_AMOUNT` | der Steuerbetrag (bei Korrekturen negativ) |
-| `IS_CORRECTION` | 0 = normale Rechnung, 1 = Skonto-Korrektur |
-| `ORIGINAL_INVOICE_ID` | bei Korrekturen: auf welche Rechnung sie sich bezieht |
+| `TAX_AMOUNT` | der Steuerbetrag; bei Skonto der **finale** Betrag nach Korrektur (überschrieben, nicht negativ) |
+| `IS_CORRECTION` | 0 = unverändert, 1 = durch Skonto überschrieben |
+| `ORIGINAL_INVOICE_ID` | bei überschriebenen Zeilen = dieselbe Rechnung (erfüllt den Constraint) |
 
 Constraints:
 
@@ -191,18 +191,14 @@ GO
 
 **`LOV_VAT_STATUS`** — Dropdown-Werte (DRAFT/APPROVED/PAID) für das Frontend, liest aus `T_CODE`.
 
-**`V_LIST_OUTPUT_VAT`** — das Herzstück. Vier `SELECT`-Blöcke per `UNION ALL`:
+**`V_LIST_OUTPUT_VAT`** — das Herzstück. Seit dem Beschluss 2026-06-16 nur noch **ein** `SELECT` (kein `UNION ALL` mehr): er liest `list_views.V_LIST_G07_INVOICE` und mappt die deutschen Spalten auf unsere Namen:
+```sql
+g7.RechnungsDatum  AS SOURCE_INVOICE_DATE,
+g7.BetragUstEUR    AS TAX_AMOUNT,
+```
+G9 (Rosenberg) und G10 (Freiburg) brauchen keinen eigenen Block mehr, weil sie über dieselbe `T_INVOICE` laufen und über G7s View mitkommen (sobald G7 die View auf B2C erweitert).
 
-1. **G7 (aktiv):** liest `list_views.V_LIST_G07_INVOICE`, mappt die deutschen Spalten auf unsere Namen:
-   ```sql
-   g7.RechnungsDatum  AS SOURCE_INVOICE_DATE,
-   g7.BetragUstEUR    AS TAX_AMOUNT,
-   ```
-2. **G9 (Stub):** liefert 0 Zeilen (`WHERE 1 = 0`), aber die richtigen Spalten. Der echte SELECT steht als Kommentar darüber.
-3. **G10 (Stub):** dito.
-4. **G8 (Stub):** Korrektur-Zweig (`IS_CORRECTION` würde 1 sein, Betrag negativ).
-
-Jeder Block liefert **dieselbe Spalten-Signatur** (8 Spalten in gleicher Reihenfolge und Typ) — das ist Pflicht bei `UNION ALL`. Deshalb die `CAST(NULL AS DECIMAL(12,2))` etc. in den Stubs: sie fixieren den Typ jeder Spalte, obwohl keine Zeile kommt.
+**`V_LIST_VAT_SKONTO`** — finaler Steuerbetrag je Rechnung aus G8 (Signatur `INVOICE_ID`, `TAX_AMOUNT`, `IS_SKONTO`). Aktuell **Stub** (`WHERE 1 = 0`), weil G8 die Felder noch nicht liefert. Diese View ist keine Output-Quelle, sondern wird in `sp_create_vat_statement` zum **Überschreiben** genutzt (ADR-010).
 
 **`V_LIST_INPUT_VAT`** — nur ein Block (G4), aktuell Stub.
 
@@ -228,9 +224,10 @@ Jeder Block liefert **dieselbe Spalten-Signatur** (8 Spalten in gleicher Reihenf
 1. `fn_check_vat_period` prüfen → ggf. Fehler werfen.
 2. Rolle prüfen (`@creator_security_level <> 1` → nur Sachbearbeiter legt an).
 3. Vorhandenen DRAFT zurücksetzen oder neuen Kopf anlegen (`SCOPE_IDENTITY()` holt die neue ID).
-4. Items einlesen: alle Zeilen aus `V_LIST_OUTPUT_VAT` und `V_LIST_INPUT_VAT`, **gefiltert auf den Periodenmonat** über `SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end`.
-5. Summen bilden (`OUTPUT` = T_INVOICE + T_PAYMENT_RECEIPT, `INPUT` = T_SUPPLIER_INVOICE), Saldo via `fn_calculate_vat_balance`, Kopf aktualisieren.
-6. Alles in einer Transaktion (`BEGIN TRAN … COMMIT`, bei Fehler `ROLLBACK`).
+4. Items **erfassen**: alle Zeilen aus `V_LIST_OUTPUT_VAT` und `V_LIST_INPUT_VAT`, **gefiltert auf den Periodenmonat** über `SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end`.
+5. Skonto **überschreiben** (ADR-010): per `UPDATE … JOIN V_LIST_VAT_SKONTO` bekommt jede Rechnung mit `IS_SKONTO='Y'` den finalen Steuerbetrag (Match über `INVOICE_ID`), `IS_CORRECTION=1`, `ORIGINAL_INVOICE_ID=SOURCE_INVOICE_ID`. Periodensicher durch die 7-Tage-Skontofrist + 10.-des-Folgemonats-Regel.
+6. Summen bilden (`OUTPUT` = T_INVOICE, `INPUT` = T_SUPPLIER_INVOICE), Saldo via `fn_calculate_vat_balance`, Kopf aktualisieren.
+7. Alles in einer Transaktion (`BEGIN TRAN … COMMIT`, bei Fehler `ROLLBACK`).
 
 **`sp_approve` / `sp_pay` / `sp_reject`** — Statuswechsel, gleiche Bauweise:
 1. Status-IDs per Name aus `T_CODE` holen.
@@ -248,16 +245,15 @@ Die wahrscheinlichsten kleinen Änderungen — und wo genau:
 
 | Wenn… | dann ändere… | konkret |
 |---|---|---|
-| G9 liefert `TAX_AMOUNT` | `V_LIST_OUTPUT_VAT`, Block 2 | Stub-SELECT durch den auskommentierten echten SELECT ersetzen |
-| G10 liefert ihre View | `V_LIST_OUTPUT_VAT`, Block 3 | Stub ersetzen, View-Namen einsetzen |
-| G8 liefert `TAX_CORRECTION_AMOUNT` | `V_LIST_OUTPUT_VAT`, Block 4 | Stub durch Korrektur-SELECT ersetzen (`-1 * …`) |
+| G7 erweitert die View auf alle Ausgangsrechnungen (B2C inkl.) | nichts | `V_LIST_OUTPUT_VAT` liefert dann automatisch G9/G10 mit |
+| G8 liefert finalen `TAX_AMOUNT` + `IS_SKONTO` | `V_LIST_VAT_SKONTO` | Stub durch den auskommentierten echten SELECT ersetzen |
 | G4 liefert ihre View | `V_LIST_INPUT_VAT` | Stub durch echten SELECT ersetzen |
-| G7 benennt Spalten um (z. B. `BetragUstEUR` → `TAX_AMOUNT`) | `V_LIST_OUTPUT_VAT`, Block 1 | nur die zwei `g7.…`-Quellspaltennamen anpassen |
-| Ein Partner nutzt einen anderen Feldnamen | betroffener Block | nur den Quellspaltennamen vor `AS TAX_AMOUNT` tauschen |
+| G7 benennt Spalten um (z. B. `BetragUstEUR` → `TAX_AMOUNT`) | `V_LIST_OUTPUT_VAT` | nur die zwei `g7.…`-Quellspaltennamen anpassen |
+| Ein Partner nutzt einen anderen Feldnamen | betroffene View | nur den Quellspaltennamen vor `AS TAX_AMOUNT` tauschen |
 
 **Goldene Regeln beim Umbau:**
 
-1. **Spalten-Signatur nie verändern** — alle vier Blöcke von `V_LIST_OUTPUT_VAT` müssen exakt dieselben 8 Ausgabespalten in derselben Reihenfolge/Typ liefern. Beim Aktivieren eines Stubs einfach den vorgefertigten Kommentar-SELECT nehmen, der passt schon.
+1. **Spalten-Signatur nie verändern** — `V_LIST_OUTPUT_VAT`, `V_LIST_INPUT_VAT` und `V_LIST_VAT_SKONTO` haben eine feste Spaltensignatur, von der `sp_create_vat_statement` abhängt. Beim Aktivieren eines Stubs den vorgefertigten Kommentar-SELECT nehmen, der passt schon.
 2. **Immer im Einzelfile *und* im Bundle ändern.** Quelle der Wahrheit sind die Einzelfiles in `sql/02_views/` etc.; das Bundle `sql/abgabe/MS5_G15_Umsatzsteuerabrechnung.sql` ist die zusammengeführte Kopie. Nach jeder Änderung Bundle aktualisieren.
 3. **`.txt` nachziehen.** Für den Upload zählt die `.txt`-Version — nach jeder `.sql`-Änderung neu kopieren (inhaltlich identisch).
-4. **Nach dem Umbau:** `py scripts/smoke_test_bundle.py --no-db` laufen lassen — er zählt, ob noch 6 Views / 3 Funcs / 4 Procs / 3 Schemas drin sind.
+4. **Nach dem Umbau:** `py scripts/smoke_test_bundle.py --no-db` laufen lassen — er zählt, ob noch 7 Views / 3 Funcs / 4 Procs / 3 Schemas drin sind.

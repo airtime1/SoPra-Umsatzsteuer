@@ -21,9 +21,10 @@ Die Trennung in zwei Dateien bildet die Berechtigungs-Realität ab: G15 darf nur
 
 ## Aktuelle Integrationslogik
 
-Gemäß ADR-008 berechnet G15 keine Steuerbeträge. Wir konsumieren TAX_AMOUNT bzw. TAX_CORRECTION_AMOUNT direkt aus Partner-Lese-Views:
+Gemäß ADR-008 berechnet G15 keine Steuerbeträge. Wir konsumieren TAX_AMOUNT direkt aus Partner-Lese-Views:
 
-- `list_views.V_LIST_OUTPUT_VAT` — UNION ALL aus G7 (Fernabsatz, aktiv), G9 (Bar Rosenberg, Stub), G10 (Bar Freiburg, Stub), G8 (Skonto-Korrektur, Stub).
+- `list_views.V_LIST_OUTPUT_VAT` — eine Quelle: G7 (`V_LIST_G07_INVOICE` über `T_INVOICE`); G9 (Bar Rosenberg) und G10 (Bar Freiburg) laufen über dieselbe Tabelle mit (Beschluss 2026-06-16). Aktuell liefert G7s View nur Fernabsatz, B2C-Erweiterung ist G7s Bring-Schuld.
+- `list_views.V_LIST_VAT_SKONTO` — finaler Steuerbetrag je Rechnung aus G8; überschreibt in `sp_create_vat_statement` den Rechnungsbetrag bei Skonto (ADR-010, aktuell Stub).
 - `list_views.V_LIST_INPUT_VAT` — G4 (Wareneingänge, Stub).
 - `list_views.V_LIST_VAT_STATEMENT`, `list_views.V_LIST_VAT_STATEMENT_ITEM` und `list_views.V_LIST_VAT_USER` kapseln die eigenen Tabellen für die Streamlit-App.
 - `stored_func.fn_get_user_security_level` liest `T_USER.SECURITYLEVEL`; die Status-Procedures prüfen erlaubte Übergänge über `T_CODE_NEXT.SECURITY_LEVEL`.

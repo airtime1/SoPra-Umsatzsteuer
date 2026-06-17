@@ -1,7 +1,13 @@
 # ADR-005: Korrekturen als eigene Item-Zeile mit negativem Betrag
 
-- **Status:** akzeptiert
+- **Status:** abgeloest durch [ADR-010](010-skonto-ueberschreiben.md) (2026-06-16)
 - **Datum:** 2026-06-03
+
+> **Hinweis:** Diese Entscheidung gilt nicht mehr. Gruppe 8 liefert je
+> Zahlungseingang den *finalen* Steuerbetrag der Rechnung; die Skonto-
+> Korrektur ueberschreibt seither den urspruenglichen `TAX_AMOUNT` der
+> Rechnung, statt als eigene Belegzeile gefuehrt zu werden. Begruendung
+> und neues Verfahren in [ADR-010](010-skonto-ueberschreiben.md).
 
 ## Kontext
 

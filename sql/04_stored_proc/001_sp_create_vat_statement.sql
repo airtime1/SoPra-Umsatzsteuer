@@ -7,12 +7,15 @@
 --   1. fn_check_vat_period pruefen.
 --   2. Vorhandener DRAFT -> Items loeschen, Kopf zuruecksetzen.
 --      Sonst Kopf neu anlegen.
---   3. Items aus list_views.V_LIST_OUTPUT_VAT (USt inkl. Skonto-
---      Korrekturen) und list_views.V_LIST_INPUT_VAT (VSt) einlesen,
---      gefiltert auf
+--   3. Items aus list_views.V_LIST_OUTPUT_VAT (USt) und
+--      list_views.V_LIST_INPUT_VAT (VSt) einlesen, gefiltert auf
 --      den Abrechnungsmonat.
---   4. Summen + fn_calculate_vat_balance -> Kopf aktualisieren.
---   5. VAT_STATEMENT_ID zurueckgeben.
+--   4. Skonto-Korrektur (ADR-010): finalen Steuerbetrag aus
+--      list_views.V_LIST_VAT_SKONTO ueber INVOICE_ID auf die
+--      erfassten Rechnungs-Items schreiben (kein eigener Beleg,
+--      sondern Ueberschreiben des urspruenglichen TAX_AMOUNT).
+--   5. Summen + fn_calculate_vat_balance -> Kopf aktualisieren.
+--   6. VAT_STATEMENT_ID zurueckgeben.
 -- ============================================================
 
 CREATE OR ALTER PROCEDURE stored_proc.sp_create_vat_statement
@@ -114,14 +117,37 @@ BEGIN
         FROM list_views.V_LIST_INPUT_VAT
         WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end;
 
+        -- 3b) Skonto-Korrektur (ADR-010, loest ADR-005 ab)
+        -- G8 liefert je Rechnung den finalen Steuerbetrag nach Skonto.
+        -- Wir ueberschreiben den urspruenglichen TAX_AMOUNT der bereits
+        -- erfassten Rechnung (Match ueber INVOICE_ID) und markieren die
+        -- Zeile als Korrektur. ORIGINAL_INVOICE_ID zeigt auf dieselbe
+        -- Rechnung (erfuellt CHK_VAT_ITEM_CORRECTION_HAS_ORIGINAL).
+        -- Periodensicher durch 7-Tage-Skontofrist + 10.-des-Folgemonats-
+        -- Regel: bei Abrechnung der Periode sind alle Skonto-Zahlungen
+        -- der enthaltenen Rechnungen bereits eingegangen.
+        UPDATE itm
+        SET itm.TAX_AMOUNT          = sk.TAX_AMOUNT,
+            itm.IS_CORRECTION       = 1,
+            itm.ORIGINAL_INVOICE_ID = itm.SOURCE_INVOICE_ID
+        FROM dbo.T_VAT_STATEMENT_ITEM itm
+        JOIN list_views.V_LIST_VAT_SKONTO sk
+          ON sk.INVOICE_ID = itm.SOURCE_INVOICE_ID
+        WHERE itm.VAT_STATEMENT_ID = @statement_id
+          AND itm.SOURCE_TABLE = 'T_INVOICE'
+          AND sk.IS_SKONTO = 'Y';
+
         -- 4) Summen + Saldo
         DECLARE @output_sum DECIMAL(12,2);
         DECLARE @input_sum  DECIMAL(12,2);
 
+        -- Output = Ausgangsrechnungen (T_INVOICE). Skonto ist bereits in
+        -- den TAX_AMOUNT dieser Zeilen eingerechnet (Schritt 3b), nicht
+        -- als eigene Belegzeile.
         SELECT @output_sum = ISNULL(SUM(TAX_AMOUNT), 0)
         FROM dbo.T_VAT_STATEMENT_ITEM
         WHERE VAT_STATEMENT_ID = @statement_id
-          AND SOURCE_TABLE IN ('T_INVOICE', 'T_PAYMENT_RECEIPT');
+          AND SOURCE_TABLE = 'T_INVOICE';
 
         SELECT @input_sum = ISNULL(SUM(TAX_AMOUNT), 0)
         FROM dbo.T_VAT_STATEMENT_ITEM

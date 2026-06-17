@@ -82,7 +82,8 @@ Wichtige eigene Objekte:
 | `dbo.T_VAT_STATEMENT` | Kopf einer monatlichen Umsatzsteuerabrechnung |
 | `dbo.T_VAT_STATEMENT_ITEM` | Detailzeilen mit einzelnen Steuerfaellen |
 | `list_views.LOV_VAT_STATUS` | Werteliste fuer `DRAFT`, `APPROVED`, `PAID` |
-| `list_views.V_LIST_OUTPUT_VAT` | Umsatzsteuer als `UNION ALL` aus G7/G9/G10 (Ausgangsrechnungen) plus Skonto-Korrekturen aus G8; konsumiert `TAX_AMOUNT`/`TAX_CORRECTION_AMOUNT` direkt aus Partner-Lese-Views, keine Eigenberechnung (ADR-008) |
+| `list_views.V_LIST_OUTPUT_VAT` | Umsatzsteuer aus allen Ausgangsrechnungen; eine Quelle `V_LIST_G07_INVOICE` (G7-View ueber `T_INVOICE`, inkl. G9/G10-Barverkaeufe), konsumiert `TAX_AMOUNT` direkt, keine Eigenberechnung (ADR-008) |
+| `list_views.V_LIST_VAT_SKONTO` | finaler Steuerbetrag je Rechnung aus G8 (Skonto); Quelle fuer den Ueberschreib-Schritt in `sp_create_vat_statement` (ADR-010), aktuell Stub |
 | `list_views.V_LIST_INPUT_VAT` | Vorsteuer aus G4 (Wareneingaenge); konsumiert `TAX_AMOUNT` direkt aus der Partner-Lese-View, keine Eigenberechnung (ADR-008) |
 | `list_views.V_LIST_VAT_STATEMENT` | Anzeige-View fuer Abrechnungskopf |
 | `list_views.V_LIST_VAT_STATEMENT_ITEM` | Anzeige-View fuer Abrechnungspositionen |
@@ -95,7 +96,7 @@ Wichtige eigene Objekte:
 | `stored_proc.sp_pay_vat_statement` | Statuswechsel `APPROVED` -> `PAID` |
 | `stored_proc.sp_reject_vat_statement` | Rueckgabe `APPROVED` -> `DRAFT` |
 
-Datenquellen (5 Partner, 3 Kategorien): Umsatzsteuer aus G7 (Fernabsatz), G9 (Bar Rosenberg), G10 (Bar Freiburg); Vorsteuer aus G4 (Wareneingaenge); Umsatzsteuer-Korrektur (Skonto) aus G8 (Zahlungseingaenge). Wir lesen je `RechnungsID`, `RechnungsDatum`, `Steuerbetrag` bzw. `Steuerkorrekturbetrag` direkt aus den Partner-Lese-Views. Details und aktueller Lieferstand: `docs/zielbild.md`, `docs/schnittstellen_annahmen.md`.
+Datenquellen (Beschluss 2026-06-16): Umsatzsteuer aus **einer** Quelle `V_LIST_G07_INVOICE` (G7-View ueber `dbo.T_INVOICE`; G9 Bar Rosenberg und G10 Bar Freiburg schreiben ueber dieselbe Tabelle und laufen darueber mit); Vorsteuer aus G4 (Wareneingaenge); finaler Steuerbetrag nach Skonto aus G8 (Zahlungseingaenge), der den Rechnungsbetrag ueberschreibt (ADR-010). Wir lesen `RechnungsID`, `RechnungsDatum`, `Steuerbetrag` direkt aus den Partner-Lese-Views, keine Eigenberechnung. Details und aktueller Lieferstand: `docs/zielbild.md`, `docs/schnittstellen_annahmen.md`.
 
 Verbindliche DB-Regeln:
 - `dbo` nicht direkt veraendern; Skripte fuer Tabellen und `T_CODE`/`T_CODE_NEXT` an den Architekten liefern (`sql/abgabe/MS5_G15_ARCHITEKT_dbo.sql`).
@@ -151,11 +152,12 @@ Die ADRs in `docs/entscheidungen/` dokumentieren den aktuellen Entscheidungsstan
 | 002 | Rollen: Sachbearbeiter legt an, CFO gibt frei, Leitung FiBu zahlt aus |
 | 003 | Fachliche Namen: `VAT_STATUS`, `SOURCE_INVOICE_DATE` |
 | 004 | Saldo als Absolutbetrag plus `VAT_TYPE` |
-| 005 | Korrekturen als eigene Item-Zeilen |
+| 005 | ~~Korrekturen als eigene Item-Zeilen~~ — abgeloest durch ADR-010 |
 | 006 | Frontend vorerst Python/Streamlit/pyodbc, Logik bleibt DB-nah wegen moeglichem phpRunner-Wechsel |
 | 007 | HdM-Namenskonventionen und Dev-DB-Befunde sind massgeblich |
 | 008 | Keine eigene Steuerberechnung; Partner-Lese-Views konsumieren; Stub-Pattern fuer fehlende Quellen |
 | 009 | Status-Procedures nutzen zentrale `dbo.fn_chk_status_folge` fuer Uebergangspruefung |
+| 010 | Skonto-Korrektur ueberschreibt finalen Steuerbetrag der Rechnung (loest ADR-005 ab); G8 liefert Endbetrag + `IS_SKONTO` |
 
 Aus der Git-Historie dauerhaft relevant:
 - PR #17 bereinigte alte Grossschreibungs-Referenzen auf Function-/Procedure-Namen. Neue Doku darf nicht mehr `SF_*`/`SP_*` als aktuelle Objektnamen verwenden, ausser beim historischen MS4-Mapping.
@@ -166,7 +168,7 @@ Aus der Git-Historie dauerhaft relevant:
 
 ## Bekannte Einschraenkungen und offene Punkte
 
-- Partner-Lieferstand 2026-06-13 gegen ERPDEV26S: G7 (`V_LIST_G07_INVOICE`) aktiv, aber deutsche Spaltennamen (Mapping in unserer View). G9 (`V_LIST_G09_INVOICE_TAX_B2C`) ohne `TAX_AMOUNT`, G8 (`V_LIST_G08_PAYMENT_RECEIPT`) ohne `TAX_CORRECTION_AMOUNT`, G10 und G4 ohne View. Diese vier laufen als Stub; Bring-Schulden als Issues #24-#28 dokumentiert.
+- Partner-Lieferstand 2026-06-16 gegen ERPDEV26S: G7 (`V_LIST_G07_INVOICE`) aktiv, aber deutsche Spaltennamen (Mapping in unserer View) und **nur Fernabsatz** — die View filtert ueber INNER JOINs auf die Angebot->Auftrag->Lieferung-Kette, B2C-Barverkaeufe (G9/G10) fehlen noch (78 von 156 G9-Rechnungen sichtbar). G7 muss die View auf alle `T_INVOICE`-Rechnungen erweitern. G4 weiterhin ohne View (`V_LIST_INPUT_VAT` Stub). G8 (`V_LIST_G08_PAYMENT_RECEIPT`) ohne finalen `TAX_AMOUNT`/`IS_SKONTO` (`V_LIST_VAT_SKONTO` Stub). Bring-Schulden als Issues #24-#28 dokumentiert.
 - Status-Workflow haengt zur Laufzeit an `dbo.fn_chk_status_folge` (in ERPDEV vorhanden, in der lokalen Sandbox nicht). Vollstaendiger Workflow-Test nur gegen ERPDEV26S.
 - Rollenpruefungen in den Status-Procedures sind technisch umgesetzt, ersetzen aber keine echte Authentifizierung im Streamlit-Prototyp.
 - `ins_views`/`upd_views` sind als Ordner vorgesehen, aber aktuell nicht implementiert und moeglicherweise durch Stored Procedures ersetzbar.
