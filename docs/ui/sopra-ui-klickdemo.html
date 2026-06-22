@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Umsatzsteuer Klickdemo</title>
+  <style>
+    :root { --bg:#f3fff7; --panel:#fff; --ink:#0d2617; --muted:#5f7568; --line:#cce9d5; --accent:#00c853; --accent-dark:#00853a; --warn:#9a6700; --danger:#b42318; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Segoe UI, Arial, sans-serif; }
+    .shell { display:grid; grid-template-columns:250px 1fr; min-height:100vh; }
+    aside { background:#062412; color:white; padding:24px 18px; }
+    .brand { font-size:20px; font-weight:750; margin-bottom:4px; }
+    .sub { color:#aaf2c4; font-size:13px; margin-bottom:28px; }
+    nav { display:grid; gap:8px; }
+    nav button { width:100%; text-align:left; border:0; border-radius:6px; background:transparent; color:#ecfff3; padding:11px 12px; font-size:15px; cursor:pointer; }
+    nav button.active, nav button:hover { background:#0c4f27; }
+    main { padding:28px; }
+    .page { display:none; } .page.active { display:block; }
+    .top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px; }
+    h1 { margin:0 0 6px; font-size:28px; } h2 { margin:0 0 14px; font-size:18px; }
+    .hint { margin:0; color:var(--muted); line-height:1.45; }
+    .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+    .two { display:grid; grid-template-columns:1.15fr .85fr; gap:18px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:17px; }
+    .metric-label { color:var(--muted); font-size:13px; margin-bottom:7px; }
+    .metric-value { font-size:24px; font-weight:750; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th,td { text-align:left; padding:11px 9px; border-bottom:1px solid var(--line); vertical-align:middle; }
+    th { color:var(--muted); background:#f5fff9; font-weight:700; }
+    tr[data-id] { cursor:pointer; } tr[data-id]:hover { background:#edfff4; }
+    .status { display:inline-flex; width:fit-content; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:750; white-space:nowrap; }
+    .DRAFT,.locked { background:#fff4d7; color:var(--warn); }
+    .APPROVED { background:#dcffe9; color:var(--accent-dark); }
+    .PAID,.allowed { background:#e4f7ed; color:var(--accent-dark); }
+    label { color:var(--muted); font-size:13px; font-weight:700; }
+    .field { display:grid; gap:7px; }
+    .form { display:grid; grid-template-columns:1.2fr 1fr auto; gap:14px; align-items:end; }
+    select,input { width:100%; border:1px solid var(--line); border-radius:6px; background:white; color:var(--ink); padding:10px; font-size:15px; }
+    button.action { border:0; border-radius:6px; background:var(--accent); color:#062412; font-weight:750; padding:11px 15px; font-size:15px; cursor:pointer; }
+    button.action.secondary { background:white; color:var(--accent-dark); border:1px solid #76e6a0; }
+    button.action.danger { background:white; color:var(--danger); border:1px solid #efb4ae; }
+    button.action:disabled { opacity:.55; cursor:not-allowed; }
+    .notice { margin-top:14px; border-radius:8px; padding:13px 14px; line-height:1.45; font-size:14px; }
+    .notice.ok { background:#e4f7ed; border:1px solid #a8dec1; color:#115b39; }
+    .notice.locked { background:#fff4d7; border:1px solid #e6c977; color:#745100; }
+    .notice.info { background:#dcffe9; border:1px solid #76e6a0; color:#006b2f; }
+    .workflow { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0 16px; }
+    .step { border:1px solid var(--line); border-radius:8px; padding:12px; background:#fbfffd; }
+    .step.current { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+    .step strong { display:block; margin-bottom:4px; } .step span { color:var(--muted); font-size:13px; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+    .month-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:16px; }
+    .month { border:1px solid var(--line); border-radius:8px; background:white; padding:11px; cursor:pointer; text-align:left; }
+    .month:hover { border-color:var(--accent); } .month strong { display:block; margin-bottom:5px; } .month span { color:var(--muted); font-size:13px; }
+    .empty { color:var(--muted); padding:20px; text-align:center; }
+    @media (max-width:950px) { .shell,.two,.grid,.form,.workflow,.month-grid { grid-template-columns:1fr; } aside{min-height:auto;} .top{flex-direction:column;} }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand">Umsatzsteuer</div>
+      <div class="sub">Klickdemo</div>
+      <nav>
+        <button class="active" data-page="overview">&Uuml;bersicht</button>
+        <button data-page="create">Neue Abrechnung</button>
+        <button data-page="detail">Detail</button>
+      </nav>
+    </aside>
+    <main>
+      <section id="overview" class="page active">
+        <div class="top"><div><h1>Abrechnungs-&Uuml;bersicht</h1><p class="hint">Mehrere Monatsabrechnungen mit Status, Saldo und Typ.</p></div><button class="action" data-open="create">Neue Abrechnung</button></div>
+        <div class="grid" id="metrics"></div>
+        <div class="card"><div class="top"><h2>Abrechnungen</h2><select id="statusFilter"><option value="ALL">Alle Status</option><option value="DRAFT">DRAFT</option><option value="APPROVED">APPROVED</option><option value="PAID">PAID</option></select></div><div id="statementTable"></div></div>
+      </section>
+      <section id="create" class="page">
+        <div class="top"><div><h1>Neue Abrechnung</h1><p class="hint">Eine Abrechnung darf erst ab dem 10. Tag des Folgemonats erstellt werden.</p></div><button class="action secondary" data-open="overview">Zur &Uuml;bersicht</button></div>
+        <div class="card"><h2>Periode ausw&auml;hlen</h2><div class="form"><div class="field"><label for="periodSelect">Abrechnungsperiode</label><select id="periodSelect"></select></div><div class="field"><label for="createdBy">Bearbeiter</label><select id="createdBy"><option>sachbearbeiter01</option><option>sachbearbeiter02</option></select></div><button id="createStatement" class="action">Abrechnung erstellen</button></div><div id="periodNotice" class="notice ok"></div><div class="month-grid" id="monthGrid"></div></div>
+      </section>
+      <section id="detail" class="page">
+        <div class="top"><div><h1>Abrechnungsdetail</h1><p class="hint">Belege, Summen, Audit-Spuren und Status-Aktionen.</p></div><button class="action secondary" data-open="overview">Zur &Uuml;bersicht</button></div>
+        <div id="detailContent"></div>
+      </section>
+    </main>
+  </div>
+  <script>
+    const today=new Date('2026-06-22T12:00:00');
+    const months=Array.from({length:12},(_,i)=>`2026-${String(i+1).padStart(2,'0')}`);
+    let selectedId=106,nextId=107;
+    const users={cfo:'cfo01',fibu:'leitung-fibu01'};
+    const itemsByPeriod={
+      '2026-01':[['T_INVOICE',7001,'2026-01-09',2210,false],['T_SUPPLIER_INVOICE',4101,'2026-01-18',-980,false]],
+      '2026-02':[['T_INVOICE',7110,'2026-02-04',1840.4,false],['T_INVOICE',7119,'2026-02-21',640,false],['T_SUPPLIER_INVOICE',4215,'2026-02-24',-1690,false]],
+      '2026-03':[['T_INVOICE',7201,'2026-03-09',1450,false],['T_SUPPLIER_INVOICE',4309,'2026-03-22',-2630.2,false]],
+      '2026-04':[['T_INVOICE',7301,'2026-04-03',2140.5,false],['T_INVOICE',7318,'2026-04-18',3800,false],['T_SUPPLIER_INVOICE',4412,'2026-04-21',-2360,false]],
+      '2026-05':[['T_INVOICE',7422,'2026-05-06',3240,false],['T_PAYMENT_RECEIPT',8108,'2026-05-14',-95.2,true],['T_SUPPLIER_INVOICE',4551,'2026-05-12',-1120,false]],
+      '2026-06':[['T_INVOICE',7502,'2026-06-05',2890,false],['T_SUPPLIER_INVOICE',4620,'2026-06-19',-740,false]],
+      '2026-07':[['T_INVOICE',7604,'2026-07-08',1950,false]],
+      '2026-08':[['T_SUPPLIER_INVOICE',4812,'2026-08-17',-890,false]]
+    };
+    const statements=[makeStatement(106,'2026-06','DRAFT','sachbearbeiter01'),makeStatement(105,'2026-05','DRAFT','sachbearbeiter02'),makeStatement(104,'2026-04','APPROVED','sachbearbeiter01','cfo01'),makeStatement(103,'2026-03','PAID','sachbearbeiter02','cfo01','leitung-fibu01'),makeStatement(102,'2026-02','PAID','sachbearbeiter01','cfo01','leitung-fibu01'),makeStatement(101,'2026-01','PAID','sachbearbeiter01','cfo01','leitung-fibu01')];
+    function makeStatement(id,period,status,createdBy,approvedBy='',closedBy=''){const items=itemsByPeriod[period]||[];const output=items.filter(i=>i[3]>0).reduce((s,i)=>s+i[3],0);const input=Math.abs(items.filter(i=>i[3]<0).reduce((s,i)=>s+i[3],0));const diff=output-input;return{id,period,status,output,input,balance:Math.abs(diff),type:diff>0?'ZAHLLAST':diff<0?'UEBERHANG':'NEUTRAL',createdBy,approvedBy,closedBy,createdAt:'22.06.2026',approvedAt:approvedBy?'22.06.2026':'',closedAt:closedBy?'22.06.2026':''};}
+    function money(v){return v.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' &euro;';}
+    function periodLabel(period){const [y,m]=period.split('-').map(Number);return new Date(y,m-1,1).toLocaleDateString('de-DE',{month:'long',year:'numeric'});}
+    function unlockDate(period){const [y,m]=period.split('-').map(Number);return new Date(y,m,10,12);}
+    function formatDate(date){return date.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
+    function openPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));renderAll();}
+    function renderMetrics(){const payable=statements.filter(s=>s.type==='ZAHLLAST').reduce((sum,s)=>sum+s.balance,0);const refund=statements.filter(s=>s.type==='UEBERHANG').reduce((sum,s)=>sum+s.balance,0);const draft=statements.filter(s=>s.status==='DRAFT').length;document.querySelector('#metrics').innerHTML=[['Abrechnungen',statements.length],['Zahllast gesamt',money(payable)],['Vorsteuer&uuml;berhang',money(refund)],['Offene Pr&uuml;fung',draft]].map(([l,v])=>`<div class="card"><div class="metric-label">${l}</div><div class="metric-value">${v}</div></div>`).join('');}
+    function renderTable(){const filter=document.querySelector('#statusFilter').value;const rows=statements.filter(s=>filter==='ALL'||s.status===filter).sort((a,b)=>b.period.localeCompare(a.period)).map(s=>`<tr data-id="${s.id}"><td>#${s.id}</td><td>${periodLabel(s.period)}</td><td><span class="status ${s.status}">${s.status}</span></td><td>${money(s.output)}</td><td>${money(s.input)}</td><td>${money(s.balance)}</td><td>${s.type}</td></tr>`).join('');document.querySelector('#statementTable').innerHTML=rows?`<table><thead><tr><th>ID</th><th>Periode</th><th>Status</th><th>USt</th><th>VSt</th><th>Saldo</th><th>Typ</th></tr></thead><tbody>${rows}</tbody></table>`:'<div class="empty">Keine Abrechnungen f&uuml;r diesen Filter.</div>';document.querySelectorAll('tr[data-id]').forEach(r=>r.addEventListener('click',()=>{selectedId=Number(r.dataset.id);openPage('detail');}));}
+    function renderPeriodSelect(){const existing=new Map(statements.map(s=>[s.period,s]));document.querySelector('#periodSelect').innerHTML=months.map(p=>{const s=existing.get(p);return`<option value="${p}">${periodLabel(p)}${s?' - '+s.status:''}</option>`;}).join('');updatePeriodNotice();renderMonthGrid();}
+    function updatePeriodNotice(){const period=document.querySelector('#periodSelect').value;const statement=statements.find(s=>s.period===period);const unlock=unlockDate(period);const allowed=today>=unlock;const notice=document.querySelector('#periodNotice');const button=document.querySelector('#createStatement');button.disabled=!allowed||(statement&&statement.status!=='DRAFT');if(!allowed){notice.className='notice locked';notice.textContent=`${periodLabel(period)} ist noch gesperrt. Diese Abrechnung darf erst ab dem ${formatDate(unlock)} erstellt werden.`;}else if(statement&&statement.status==='DRAFT'){notice.className='notice info';notice.textContent=`${periodLabel(period)} existiert als DRAFT. Ein Klick oeffnet die vorhandene Abrechnung zur Pruefung.`;}else if(statement){notice.className='notice locked';notice.textContent=`${periodLabel(period)} ist bereits ${statement.status}. Diese Periode darf nicht neu berechnet werden.`;}else{notice.className='notice ok';notice.textContent=`${periodLabel(period)} ist abrechenbar. Der Stichtag ${formatDate(unlock)} ist erreicht.`;}}
+    function renderMonthGrid(){const existing=new Map(statements.map(s=>[s.period,s]));document.querySelector('#monthGrid').innerHTML=months.map(p=>{const s=existing.get(p);const allowed=today>=unlockDate(p);const state=s?s.status:allowed?'frei':'gesperrt';const cls=s?s.status:allowed?'allowed':'locked';return`<button class="month" data-period="${p}"><strong>${periodLabel(p)}</strong><span class="status ${cls}">${state}</span><br><span>ab ${formatDate(unlockDate(p))}</span></button>`;}).join('');document.querySelectorAll('.month').forEach(b=>b.addEventListener('click',()=>{document.querySelector('#periodSelect').value=b.dataset.period;updatePeriodNotice();}));}
+    function renderDetail(){const s=statements.find(x=>x.id===selectedId)||statements[0];selectedId=s.id;const rows=(itemsByPeriod[s.period]||[]).map((item,i)=>`<tr><td>${i+1}</td><td>${item[0]}</td><td>${item[1]}</td><td>${item[2]}</td><td>${money(Math.abs(item[3]))}</td><td>${item[4]?'Ja':'Nein'}</td></tr>`).join('');document.querySelector('#detailContent').innerHTML=`<div class="two"><div class="card"><div class="top"><h2>#${s.id} - ${periodLabel(s.period)}</h2><span class="status ${s.status}">${s.status}</span></div><div class="grid"><div><div class="metric-label">Umsatzsteuer</div><div class="metric-value">${money(s.output)}</div></div><div><div class="metric-label">Vorsteuer</div><div class="metric-value">${money(s.input)}</div></div><div><div class="metric-label">${s.type}</div><div class="metric-value">${money(s.balance)}</div></div><div><div class="metric-label">Periode</div><div class="metric-value">${s.period}</div></div></div><h2>Steuerfaelle</h2><table><thead><tr><th>#</th><th>Quelle</th><th>Beleg</th><th>Datum</th><th>Betrag</th><th>Korrektur</th></tr></thead><tbody>${rows}</tbody></table></div><div class="card"><h2>Status-Workflow</h2><div class="workflow">${['DRAFT','APPROVED','PAID'].map(step=>`<div class="step ${s.status===step?'current':''}"><strong>${step}</strong><span>${workflowText(step)}</span></div>`).join('')}</div><div class="actions"><button class="action" id="approveBtn" ${s.status!=='DRAFT'?'disabled':''}>Freigeben</button><button class="action" id="payBtn" ${s.status!=='APPROVED'?'disabled':''}>Auszahlen</button><button class="action danger" id="rejectBtn" ${s.status!=='APPROVED'?'disabled':''}>Zurueckweisen</button></div><div class="notice ok">Erstellt: ${s.createdBy} / ${s.createdAt}<br>Freigegeben: ${s.approvedBy||'-'} / ${s.approvedAt||'-'}<br>Abgeschlossen: ${s.closedBy||'-'} / ${s.closedAt||'-'}</div></div></div>`;document.querySelector('#approveBtn').addEventListener('click',()=>changeStatus('APPROVED'));document.querySelector('#payBtn').addEventListener('click',()=>changeStatus('PAID'));document.querySelector('#rejectBtn').addEventListener('click',()=>changeStatus('DRAFT'));}
+    function workflowText(step){return{DRAFT:'Belege gesammelt und pruefbar.',APPROVED:'Durch CFO freigegeben.',PAID:'Durch Leitung FiBu abgeschlossen.'}[step];}
+    function changeStatus(status){const s=statements.find(x=>x.id===selectedId);s.status=status;if(status==='APPROVED'){s.approvedBy=users.cfo;s.approvedAt='22.06.2026';}if(status==='PAID'){s.closedBy=users.fibu;s.closedAt='22.06.2026';}if(status==='DRAFT'){s.approvedBy='';s.approvedAt='';}renderAll();}
+    function createStatement(){const period=document.querySelector('#periodSelect').value;const existing=statements.find(s=>s.period===period);if(existing){selectedId=existing.id;openPage('detail');return;}const createdBy=document.querySelector('#createdBy').value;const s=makeStatement(nextId++,period,'DRAFT',createdBy);statements.unshift(s);selectedId=s.id;openPage('detail');}
+    function renderAll(){renderMetrics();renderTable();renderPeriodSelect();renderDetail();}
+    document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>openPage(b.dataset.page)));
+    document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>openPage(b.dataset.open)));
+    document.querySelector('#statusFilter').addEventListener('change',renderTable);
+    document.querySelector('#periodSelect').addEventListener('change',updatePeriodNotice);
+    document.querySelector('#createStatement').addEventListener('click',createStatement);
+    renderAll();
+  </script>
+</body>
+</html>
