@@ -1,9 +1,9 @@
 -- ============================================================================
--- MS5 Abgabe-Bundle — Gruppe 15 — Umsatzsteuerabrechnung
--- Stand: 2026-06-13
+-- 1.2 Abgabe MS5 Gruppe 15 Umsatzsteuerabrechnung
 -- ============================================================================
--- Dieses Skript baut alle Objekte von Gruppe 15 auf, die in eigenen
--- Schemata liegen (list_views, stored_func, stored_proc).
+-- Funktions-Aufbau: alle Objekte unseres eigenen Schemas
+-- (list_views, stored_func, stored_proc). Gegenstück zur Architektur-Datei 1.1
+-- (dbo-Anteil), die der Architekt ausführt.
 --
 -- INHALT:
 --   A) Schemas anlegen, falls nicht vorhanden
@@ -11,29 +11,30 @@
 --   C) stored_func.fn_* — Stored Functions
 --   D) stored_proc.sp_* — Stored Procedures (Statusworkflow)
 --
--- AUSFUEHRUNG:
---   - In SSMS / Azure Data Studio / VS Code MSSQL gegen die Ziel-DB oeffnen.
---   - Skript komplett ausfuehren. Batch-Trenner ist GO.
+-- Hinweis (Stand 17.06.2026): Dieses Bundle ist an sich fertig, kann aber erst ausgeführt
+-- werden, nachdem die Tabellen dbo.T_VAT_STATEMENT / dbo.T_VAT_STATEMENT_ITEM (Datei 1.1)
+-- angelegt wurden. Aktive
+-- Quelle ist G7 (list_views.V_LIST_G07_INVOICE); G9 & G10 sollen über dieselbe
+-- G07-View mitlaufen (aktuell noch nicht funktionsfähig). Die Skonto-Korrektur aus G8 und die Vorsteuer aus G4
+-- laufen so lange als Stub (0 Zeilen), bis die letzten Parameter ergänzt sind. Der fertige
+-- SELECT steht jeweils als Kommentar bereit und muss nur eingesetzt werden.
 --
 -- VORAUSSETZUNG:
---   Vor diesem Bundle muss der dbo-Anteil vom Datenbank-Architekten
---   bereitgestellt sein (siehe MS5_G15_ARCHITEKT_dbo.sql):
 --     - T_CODE-Eintraege fuer VAT_STATUS
 --     - dbo.T_CODE_NEXT-Eintraege fuer die VAT_STATUS-Uebergaenge
 --     - dbo.T_VAT_STATEMENT, dbo.T_VAT_STATEMENT_ITEM
---   Ausserdem nutzen die Status-Procedures die zentrale Architekten-
---   Function dbo.fn_chk_status_folge (in ERPDEV26S vorhanden). Sie prueft
---   anhand dbo.T_CODE_NEXT, ob ein Statusuebergang erlaubt ist.
+--     - dbo.fn_chk_status_folge (von den Status-Procedures genutzt; in ERPDEV26S bereits vorhanden)
+-- müssen vorhanden sein.
 --
--- ARCHITEKTUR-LEITLINIE (siehe ADR-008):
---   Gruppe 15 berechnet keine Steuerbetraege. Wir konsumieren
---   Partner-Lese-Views und lesen direkt TAX_AMOUNT bzw.
---   TAX_CORRECTION_AMOUNT.
+-- ARCHITEKTUR-LEITLINIE (interne Gruppendokumente: ADR-008 / ADR-010):
+--   Gruppe 15 berechnet keine Steuerbeträge, wir konsumieren
+--   Partner-Lese-Views und lesen direkt TAX_AMOUNT.
 --   Quellen:
---     - list_views.V_LIST_G07_INVOICE         (Ausgangsrechnungen Fernabsatz)
---     - list_views.V_LIST_G09_INVOICE_TAX_B2C (Ausgangsrechnungen Bar Rosenberg, STUB)
---     - list_views.V_LIST_G10_INVOICE_*       (Ausgangsrechnungen Bar Freiburg, STUB)
---     - list_views.V_LIST_G08_PAYMENT_RECEIPT (Skonto-Korrektur, STUB)
+--     - list_views.V_LIST_G07_INVOICE          (ALLE Ausgangsrechnungen über
+--                                                T_INVOICE; G9 Bar Rosenberg und
+--                                                G10 Bar Freiburg laufen mit [so der Plan])
+--     - list_views.V_LIST_G08_PAYMENT_RECEIPT  (finaler Steuerbetrag nach
+--                                                Skonto, überschreibt, STUB [isSkonto Y/N fehlt])
 --     - list_views.V_LIST_G04_SUPPLIER_INVOICE (Eingangsrechnungen, STUB)
 --
 -- IDEMPOTENZ:
@@ -66,8 +67,8 @@ GO
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- list_views.LOV_VAT_STATUS — Werteliste der VAT-Status fuer das Frontend.
--- Quelle: sql/02_views/001_lov_vat_status.sql
+-- list_views.LOV_VAT_STATUS — Werteliste der VAT-Status für das Frontend.
+-- (Interne Doku-Quelle: sql/02_views/001_lov_vat_status.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER VIEW list_views.LOV_VAT_STATUS
 AS
@@ -79,13 +80,22 @@ WHERE CODE_TYPE = 'VAT_STATUS';
 GO
 
 -- ----------------------------------------------------------------------------
--- list_views.V_LIST_OUTPUT_VAT — Umsatzsteuer aus G7/G9/G10 + Korrekturen G8.
--- Quelle: sql/02_views/002_v_list_output_vat.sql
+-- list_views.V_LIST_OUTPUT_VAT — Umsatzsteuer aus allen Ausgangsrechnungen.
+-- (Interne Doku-Quelle: sql/02_views/002_v_list_output_vat.sql)
 -- ----------------------------------------------------------------------------
+-- Eine Quelle (Abstimmung im Coaching am 15./16.06.): G7 stellt mit V_LIST_G07_INVOICE die
+-- gemeinsame Rechnungs-View über dbo.T_INVOICE bereit. G9 (Bar Rosenberg) und
+-- G10 (Bar Freiburg) schreiben über dieselbe T_INVOICE und werden darüber
+-- mitgeliefert -> kein eigener G9/G10-Block, keine UNIONs.
+-- Skonto läuft nicht mehr hier, sondern als Überschreiben in
+-- sp_create_vat_statement (Interne Doku-Quelle: ADR-010, Quelle list_views.V_LIST_VAT_SKONTO).
+-- 
+-- OFFENES PROBLEM (Bring-Schuld G7, G9 & G10): V_LIST_G07_INVOICE liefert aktuell
+-- nur Fernabsatz (INNER JOINs auf Angebot->Auftrag->Lieferung); B2C-Bar-
+-- Verkäufe fehlen noch.
+
 CREATE OR ALTER VIEW list_views.V_LIST_OUTPUT_VAT
 AS
-
--- QUELLE 1/4: G7 Fernabsatz (AKTIV)
 SELECT
     CAST('T_INVOICE' AS VARCHAR(50))   AS SOURCE_TABLE,
     g7.INVOICE_ID                      AS SOURCE_INVOICE_ID,
@@ -95,71 +105,34 @@ SELECT
     g7.BetragUstEUR                    AS TAX_AMOUNT,
     CAST(0 AS BIT)                     AS IS_CORRECTION,
     CAST(NULL AS INT)                  AS ORIGINAL_INVOICE_ID
-FROM list_views.V_LIST_G07_INVOICE g7
+FROM list_views.V_LIST_G07_INVOICE g7;
+GO
 
-UNION ALL
+-- ----------------------------------------------------------------------------
+-- list_views.V_LIST_VAT_SKONTO — finaler Steuerbetrag je Rechnung aus G8.
+-- (Interne Doku-Quelle: sql/02_views/007_v_list_vat_skonto.sql)
+-- ----------------------------------------------------------------------------
+-- G8 liefert je Zahlungseingang den FINALEN Steuerbetrag der Rechnung nach
+-- Skonto. sp_create_vat_statement überschreibt damit den ursprünglichen
+-- TAX_AMOUNT (Match über INVOICE_ID), wenn IS_SKONTO = 'Y'.
+-- STUB (WHERE 1 = 0): G8 liefert finalen TAX_AMOUNT / IS_SKONTO noch nicht. Aktivieren bei Lieferung:
 
--- QUELLE 2/4: G9 Bar Rosenberg (STUB - TAX_AMOUNT fehlt)
--- Aktivieren bei Lieferung:
---   SELECT CAST('T_INVOICE' AS VARCHAR(50)), g9.INVOICE_ID, g9.INVOICE_DATE,
---          g9.INVOICE_ID, g9.INVOICE_DATE, g9.TAX_AMOUNT,
---          CAST(0 AS BIT), CAST(NULL AS INT)
---   FROM list_views.V_LIST_G09_INVOICE_TAX_B2C g9
-SELECT
-    CAST('T_INVOICE' AS VARCHAR(50))   AS SOURCE_TABLE,
-    CAST(NULL AS INT)                  AS SOURCE_INVOICE_ID,
-    CAST(NULL AS DATE)                 AS SOURCE_INVOICE_DATE,
-    CAST(NULL AS INT)                  AS INVOICE_ID,
-    CAST(NULL AS DATE)                 AS INVOICE_DATE,
-    CAST(NULL AS DECIMAL(12,2))        AS TAX_AMOUNT,
-    CAST(0 AS BIT)                     AS IS_CORRECTION,
-    CAST(NULL AS INT)                  AS ORIGINAL_INVOICE_ID
-WHERE 1 = 0
-
-UNION ALL
-
--- QUELLE 3/4: G10 Bar Freiburg (STUB - View existiert nicht)
--- Aktivieren bei Lieferung von G10 mit erwartetem View-Schema analog zu G9.
-SELECT
-    CAST('T_INVOICE' AS VARCHAR(50))   AS SOURCE_TABLE,
-    CAST(NULL AS INT)                  AS SOURCE_INVOICE_ID,
-    CAST(NULL AS DATE)                 AS SOURCE_INVOICE_DATE,
-    CAST(NULL AS INT)                  AS INVOICE_ID,
-    CAST(NULL AS DATE)                 AS INVOICE_DATE,
-    CAST(NULL AS DECIMAL(12,2))        AS TAX_AMOUNT,
-    CAST(0 AS BIT)                     AS IS_CORRECTION,
-    CAST(NULL AS INT)                  AS ORIGINAL_INVOICE_ID
-WHERE 1 = 0
-
-UNION ALL
-
--- QUELLE 4/4: G8 Skonto-Korrektur (STUB - TAX_CORRECTION_AMOUNT fehlt)
--- Aktivieren bei Lieferung:
---   SELECT CAST('T_PAYMENT_RECEIPT' AS VARCHAR(50)),
---          g8.RECEIPT_ID, g8.RECEIPT_DATE,
---          g8.INVOICE_ID, g8.RECEIPT_DATE,
---          -1 * g8.TAX_CORRECTION_AMOUNT,
---          CAST(1 AS BIT), g8.INVOICE_ID
+--   SELECT g8.INVOICE_ID, g8.TAX_AMOUNT, g8.IS_SKONTO
 --   FROM list_views.V_LIST_G08_PAYMENT_RECEIPT g8
---   WHERE g8.SKONTO_BERECHTIGT_YN = 'Y'
---     AND ISNULL(g8.STORNO_YN, 'N') <> 'Y'
---     AND g8.TAX_CORRECTION_AMOUNT IS NOT NULL
---     AND g8.TAX_CORRECTION_AMOUNT <> 0
+--   WHERE ISNULL(g8.STORNO_YN, 'N') <> 'Y'
+
+CREATE OR ALTER VIEW list_views.V_LIST_VAT_SKONTO
+AS
 SELECT
-    CAST('T_PAYMENT_RECEIPT' AS VARCHAR(50)) AS SOURCE_TABLE,
-    CAST(NULL AS INT)                        AS SOURCE_INVOICE_ID,
-    CAST(NULL AS DATE)                       AS SOURCE_INVOICE_DATE,
-    CAST(NULL AS INT)                        AS INVOICE_ID,
-    CAST(NULL AS DATE)                       AS INVOICE_DATE,
-    CAST(NULL AS DECIMAL(12,2))              AS TAX_AMOUNT,
-    CAST(1 AS BIT)                           AS IS_CORRECTION,
-    CAST(NULL AS INT)                        AS ORIGINAL_INVOICE_ID
+    CAST(NULL AS INT)            AS INVOICE_ID,
+    CAST(NULL AS DECIMAL(12,2))  AS TAX_AMOUNT,
+    CAST(NULL AS CHAR(1))        AS IS_SKONTO
 WHERE 1 = 0;
 GO
 
 -- ----------------------------------------------------------------------------
 -- list_views.V_LIST_INPUT_VAT — Vorsteuer aus G4 (STUB)
--- Quelle: sql/02_views/003_v_list_input_vat.sql
+-- (Interne Doku-Quelle: sql/02_views/003_v_list_input_vat.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER VIEW list_views.V_LIST_INPUT_VAT
 AS
@@ -185,7 +158,7 @@ GO
 
 -- ----------------------------------------------------------------------------
 -- list_views.V_LIST_VAT_STATEMENT — Anzeige-View Abrechnungskoepfe.
--- Quelle: sql/02_views/004_v_list_vat_statement.sql
+-- (Interne Doku-Quelle: sql/02_views/004_v_list_vat_statement.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER VIEW list_views.V_LIST_VAT_STATEMENT
 AS
@@ -208,7 +181,7 @@ GO
 
 -- ----------------------------------------------------------------------------
 -- list_views.V_LIST_VAT_STATEMENT_ITEM — Anzeige-View Beleg-Items.
--- Quelle: sql/02_views/005_v_list_vat_statement_item.sql
+-- (Interne Doku-Quelle: sql/02_views/005_v_list_vat_statement_item.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER VIEW list_views.V_LIST_VAT_STATEMENT_ITEM
 AS
@@ -227,8 +200,8 @@ FROM dbo.T_VAT_STATEMENT_ITEM;
 GO
 
 -- ----------------------------------------------------------------------------
--- list_views.V_LIST_VAT_USER — Login + Rollen-Demo (keine Passwoerter).
--- Quelle: sql/02_views/006_v_list_vat_user.sql
+-- list_views.V_LIST_VAT_USER — Login + Rollen-Demo (keine Passwörter).
+-- (Interne Doku-Quelle: sql/02_views/006_v_list_vat_user.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER VIEW list_views.V_LIST_VAT_USER
 AS
@@ -252,7 +225,7 @@ GO
 
 -- ----------------------------------------------------------------------------
 -- stored_func.fn_check_vat_period
--- Quelle: sql/03_stored_func/001_fn_check_vat_period.sql
+-- (Interne Doku-Quelle: sql/03_stored_func/001_fn_check_vat_period.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER FUNCTION stored_func.fn_check_vat_period
 (
@@ -292,7 +265,7 @@ GO
 
 -- ----------------------------------------------------------------------------
 -- stored_func.fn_calculate_vat_balance
--- Quelle: sql/03_stored_func/002_fn_calculate_vat_balance.sql
+-- (Interne Doku-Quelle: sql/03_stored_func/002_fn_calculate_vat_balance.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER FUNCTION stored_func.fn_calculate_vat_balance
 (
@@ -319,7 +292,7 @@ GO
 
 -- ----------------------------------------------------------------------------
 -- stored_func.fn_get_user_security_level
--- Quelle: sql/03_stored_func/003_fn_get_user_security_level.sql
+-- (Interne Doku-Quelle: sql/03_stored_func/003_fn_get_user_security_level.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER FUNCTION stored_func.fn_get_user_security_level
 (
@@ -346,7 +319,7 @@ GO
 
 -- ----------------------------------------------------------------------------
 -- stored_proc.sp_create_vat_statement — Anlegen / Neuberechnen einer Periode.
--- Quelle: sql/04_stored_proc/001_sp_create_vat_statement.sql
+-- (Interne Doku-Quelle: sql/04_stored_proc/001_sp_create_vat_statement.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE stored_proc.sp_create_vat_statement
     @vat_period  CHAR(7),
@@ -444,13 +417,31 @@ BEGIN
         FROM list_views.V_LIST_INPUT_VAT
         WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end;
 
+        -- Skonto-Korrektur (ADR-010, loest ADR-005 ab): finalen Steuerbetrag
+        -- aus G8 auf die erfasste Rechnung schreiben (Match ueber INVOICE_ID),
+        -- IS_CORRECTION setzen, ORIGINAL_INVOICE_ID = SOURCE_INVOICE_ID
+        -- (erfuellt CHK_VAT_ITEM_CORRECTION_HAS_ORIGINAL). Periodensicher durch
+        -- 7-Tage-Skontofrist + 10.-des-Folgemonats-Regel.
+        UPDATE itm
+        SET itm.TAX_AMOUNT          = sk.TAX_AMOUNT,        -- finaler Betrag von G8 ersetzt den Rechnungsbetrag
+            itm.IS_CORRECTION       = 1,                    -- markiert: hier hat Skonto gewirkt
+            itm.ORIGINAL_INVOICE_ID = itm.SOURCE_INVOICE_ID -- zeigt auf dieselbe Rechnung (erfuellt Constraint)
+        FROM dbo.T_VAT_STATEMENT_ITEM itm
+        JOIN list_views.V_LIST_VAT_SKONTO sk
+          ON sk.INVOICE_ID = itm.SOURCE_INVOICE_ID
+        WHERE itm.VAT_STATEMENT_ID = @statement_id
+          AND itm.SOURCE_TABLE = 'T_INVOICE'
+          AND sk.IS_SKONTO = 'Y';
+
         DECLARE @output_sum DECIMAL(12,2);
         DECLARE @input_sum  DECIMAL(12,2);
 
+        -- Output = Ausgangsrechnungen (T_INVOICE); Skonto ist bereits in deren
+        -- TAX_AMOUNT eingerechnet, keine eigene Belegzeile.
         SELECT @output_sum = ISNULL(SUM(TAX_AMOUNT), 0)
         FROM dbo.T_VAT_STATEMENT_ITEM
         WHERE VAT_STATEMENT_ID = @statement_id
-          AND SOURCE_TABLE IN ('T_INVOICE', 'T_PAYMENT_RECEIPT');
+          AND SOURCE_TABLE = 'T_INVOICE';
 
         SELECT @input_sum = ISNULL(SUM(TAX_AMOUNT), 0)
         FROM dbo.T_VAT_STATEMENT_ITEM
@@ -484,7 +475,7 @@ GO
 -- ----------------------------------------------------------------------------
 -- stored_proc.sp_approve_vat_statement — DRAFT -> APPROVED (CFO, Stufe 3).
 -- Transitionspruefung ueber zentrale dbo.fn_chk_status_folge.
--- Quelle: sql/04_stored_proc/002_sp_approve_vat_statement.sql
+-- (Interne Doku-Quelle: sql/04_stored_proc/002_sp_approve_vat_statement.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE stored_proc.sp_approve_vat_statement
     @statement_id INT,
@@ -558,7 +549,7 @@ GO
 -- ----------------------------------------------------------------------------
 -- stored_proc.sp_pay_vat_statement — APPROVED -> PAID (Leitung FiBu, Stufe 2).
 -- Transitionspruefung ueber zentrale dbo.fn_chk_status_folge.
--- Quelle: sql/04_stored_proc/003_sp_pay_vat_statement.sql
+-- (Interne Doku-Quelle: sql/04_stored_proc/003_sp_pay_vat_statement.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE stored_proc.sp_pay_vat_statement
     @statement_id INT,
@@ -632,7 +623,7 @@ GO
 -- ----------------------------------------------------------------------------
 -- stored_proc.sp_reject_vat_statement — APPROVED -> DRAFT (CFO, Stufe 3).
 -- Transitionspruefung ueber zentrale dbo.fn_chk_status_folge.
--- Quelle: sql/04_stored_proc/004_sp_reject_vat_statement.sql
+-- (Interne Doku-Quelle: sql/04_stored_proc/004_sp_reject_vat_statement.sql)
 -- ----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE stored_proc.sp_reject_vat_statement
     @statement_id INT,
@@ -709,12 +700,12 @@ GO
 -- ENDE — MS5 Abgabe-Bundle Gruppe 15
 -- ----------------------------------------------------------------------------
 -- Aktivierung der Stub-Quellen nach Partner-Lieferung:
+--   - G7 erweitert V_LIST_G07_INVOICE auf ALLE T_INVOICE-Ausgangsrechnungen
+--       (inkl. B2C G9/G10 ohne Angebot->Auftrag->Lieferung-Kette).
+--       -> V_LIST_OUTPUT_VAT bleibt unveraendert, liefert dann automatisch alle.
 --   - G4 ergaenzt list_views.V_LIST_G04_SUPPLIER_INVOICE
 --       -> Stub-Block in V_LIST_INPUT_VAT durch aktiven SELECT ersetzen.
---   - G9 ergaenzt Spalte TAX_AMOUNT in V_LIST_G09_INVOICE_TAX_B2C
---       -> Stub-Block fuer G9 in V_LIST_OUTPUT_VAT durch aktiven SELECT ersetzen.
---   - G10 liefert list_views.V_LIST_G10_INVOICE_*
---       -> Stub-Block fuer G10 in V_LIST_OUTPUT_VAT durch aktiven SELECT ersetzen.
---   - G8 ergaenzt Spalte TAX_CORRECTION_AMOUNT in V_LIST_G08_PAYMENT_RECEIPT
---       -> Stub-Block fuer G8 in V_LIST_OUTPUT_VAT durch aktiven SELECT ersetzen.
+--   - G8 ergaenzt finalen TAX_AMOUNT + IS_SKONTO in V_LIST_G08_PAYMENT_RECEIPT
+--       -> Stub in V_LIST_VAT_SKONTO durch aktiven SELECT ersetzen (ADR-010).
 -- ============================================================================
+

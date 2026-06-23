@@ -29,7 +29,7 @@ from scripts.deploy_sandbox import split_batches  # noqa: E402
 BUNDLE_PATH = PROJECT_ROOT / "sql" / "abgabe" / "MS5_G15_Umsatzsteuerabrechnung.sql"
 
 EXPECTED_COUNTS = {
-    "CREATE OR ALTER VIEW":      6,
+    "CREATE OR ALTER VIEW":      7,
     "CREATE OR ALTER FUNCTION":  3,
     "CREATE OR ALTER PROCEDURE": 4,
     "CREATE SCHEMA":             3,
@@ -113,8 +113,9 @@ def step_inventory() -> None:
     expected = {
         "dbo": {"T_VAT_STATEMENT", "T_VAT_STATEMENT_ITEM"},
         "list_views": {
-            "LOV_VAT_STATUS", "V_LIST_OUTPUT_VAT", "V_LIST_INPUT_VAT",
-            "V_LIST_VAT_STATEMENT", "V_LIST_VAT_STATEMENT_ITEM", "V_LIST_VAT_USER",
+            "LOV_VAT_STATUS", "V_LIST_OUTPUT_VAT", "V_LIST_VAT_SKONTO",
+            "V_LIST_INPUT_VAT", "V_LIST_VAT_STATEMENT",
+            "V_LIST_VAT_STATEMENT_ITEM", "V_LIST_VAT_USER",
         },
         "stored_func": {
             "fn_check_vat_period", "fn_calculate_vat_balance",

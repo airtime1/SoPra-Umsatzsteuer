@@ -36,9 +36,11 @@ Erzeuger.
    Partner-View im Schema `list_views`. Wir lesen die nach Konvention
    vereinbarten Spalten direkt:
 
-   - `TAX_AMOUNT` von G4 (Vorsteuer), G7/G9/G10 (Umsatzsteuer)
-   - `TAX_CORRECTION_AMOUNT` von G8 (Skonto-Korrektur, positiv geliefert,
-     in unserer View negiert)
+   - `TAX_AMOUNT` von G4 (Vorsteuer) und G7 (Umsatzsteuer aller Ausgangs-
+     rechnungen; G9/G10 laufen ueber dieselbe View, Beschluss 2026-06-16)
+   - finaler `TAX_AMOUNT` nach Skonto von G8 (ueberschreibt den Rechnungs-
+     betrag, siehe ADR-010 — loest die fruehere `TAX_CORRECTION_AMOUNT`-
+     Negierung ab)
 
 3. **Fehlende Partner-Felder oder fehlende Partner-Views ergeben keinen
    Workaround und keinen Fallback.** Die Bring-Schuld liegt bei der jeweiligen
@@ -95,11 +97,11 @@ Negativ:
 
 ## Aktivierungs-Vermerk
 
-Folgende Stubs sind beim Erstellen dieser Entscheidung aktiv (Stand 2026-06-13):
+Aktueller Stand der Stubs (2026-06-16; G9/G10 und das G8-Skonto-Verfahren
+durch den Beschluss 2026-06-16 / ADR-010 angepasst):
 
 | Quelle | Erwartete Partner-View | Erwartete Spalte |
 |---|---|---|
 | G4 | `list_views.V_LIST_G04_SUPPLIER_INVOICE` | `TAX_AMOUNT` |
-| G9 | `list_views.V_LIST_G09_INVOICE_TAX_B2C` | `TAX_AMOUNT` |
-| G10 | `list_views.V_LIST_G10_INVOICE_*` (Name offen) | `TAX_AMOUNT` |
-| G8 | `list_views.V_LIST_G08_PAYMENT_RECEIPT` | `TAX_CORRECTION_AMOUNT` |
+| G7 (inkl. G9/G10) | `list_views.V_LIST_G07_INVOICE` | `TAX_AMOUNT` (alle Ausgangsrechnungen) |
+| G8 | `list_views.V_LIST_G08_PAYMENT_RECEIPT` | `INVOICE_ID`, finaler `TAX_AMOUNT`, `IS_SKONTO` (ADR-010) |
