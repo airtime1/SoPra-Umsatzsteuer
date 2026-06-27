@@ -67,7 +67,7 @@ Arbeitsdokumentation beschreibt immer den aktuellen Soll-Zustand. Veraltete Auss
 - Gemeinsame Entwicklungsdatenbank: `ERPDEV26S`.
 - Eigene Sandbox: persoenliche Datenbank nach Muster `s26s5xx_DATAMART`.
 - Frontend: Python 3.11+, Streamlit, pyodbc, python-dotenv, pandas.
-- Aktive DB-Verbindung der Streamlit-App wird ueber `APP_DB_PROFILE` gesteuert: `app`, `dev` oder `sandbox`.
+- Die finale Streamlit-App nutzt den vorgesehenen APP-Zugang direkt (`get_app_conn()`), nicht die Sandbox. `APP_DB_PROFILE`/`get_active_conn()` existiert noch fuer Legacy-/Hilfszwecke, ist aber nicht mehr die Laufzeitquelle der UI.
 - Tests: SQL-Testskripte gegen Sandbox; pytest ist als geplanter Wrapper in `requirements.txt`, eine Python-Test-Suite ist noch nicht angelegt.
 - Repo-Workflow: GitHub Team-Repo mit Feature-Branches, Pull Requests, mindestens einem Review und Squash-Merge.
 
@@ -82,19 +82,18 @@ Wichtige eigene Objekte:
 | `dbo.T_VAT_STATEMENT` | Kopf einer monatlichen Umsatzsteuerabrechnung |
 | `dbo.T_VAT_STATEMENT_ITEM` | Detailzeilen mit einzelnen Steuerfaellen |
 | `list_views.LOV_VAT_STATUS` | Werteliste fuer `DRAFT`, `APPROVED`, `PAID` |
-| `list_views.V_LIST_OUTPUT_VAT` | Umsatzsteuer aus allen Ausgangsrechnungen; eine Quelle `V_LIST_G07_INVOICE` (G7-View ueber `T_INVOICE`, inkl. G9/G10-Barverkaeufe), konsumiert `TAX_AMOUNT` direkt, keine Eigenberechnung (ADR-008) |
-| `list_views.V_LIST_VAT_SKONTO` | finaler Steuerbetrag je Rechnung aus G8 (Skonto); Quelle fuer den Ueberschreib-Schritt in `sp_create_vat_statement` (ADR-010), aktuell Stub |
-| `list_views.V_LIST_INPUT_VAT` | Vorsteuer aus G4 (Wareneingaenge); konsumiert `TAX_AMOUNT` direkt aus der Partner-Lese-View, keine Eigenberechnung (ADR-008) |
-| `list_views.V_LIST_VAT_STATEMENT` | Anzeige-View fuer Abrechnungskopf |
-| `list_views.V_LIST_VAT_STATEMENT_ITEM` | Anzeige-View fuer Abrechnungspositionen |
-| `list_views.V_LIST_VAT_USER` | Minimale User-/Rollen-View ohne Passwortdaten |
-| `stored_func.fn_check_vat_period` | Prueft Periodenformat, 10.-des-Folgemonats-Regel und Sperrstatus |
-| `stored_func.fn_calculate_vat_balance` | Berechnet `VAT_BALANCE` als Absolutbetrag und `VAT_TYPE` |
-| `stored_func.fn_get_user_security_level` | Ermittelt `T_USER.SECURITYLEVEL` fuer Rollenpruefungen |
-| `stored_proc.sp_create_vat_statement` | Legt Abrechnung an oder berechnet bestehenden `DRAFT` neu |
-| `stored_proc.sp_approve_vat_statement` | Statuswechsel `DRAFT` -> `APPROVED` |
-| `stored_proc.sp_pay_vat_statement` | Statuswechsel `APPROVED` -> `PAID` |
-| `stored_proc.sp_reject_vat_statement` | Rueckgabe `APPROVED` -> `DRAFT` |
+| `list_views.V_LIST_G15_OUTPUT_VAT` | Umsatzsteuer aus allen Ausgangsrechnungen; konsumiert `TAX_AMOUNT` direkt, keine Eigenberechnung (ADR-008) |
+| `list_views.V_LIST_G15_VAT_SKONTO` | finaler Steuerbetrag je Rechnung aus G8 (Skonto); Quelle fuer den Ueberschreib-Schritt in `sp_G15_create_vat_statement` (ADR-010), aktuell Stub |
+| `list_views.V_LIST_G15_INPUT_VAT` | Vorsteuer aus G4 (Wareneingaenge); konsumiert `TAX_AMOUNT` direkt aus der Partner-Lese-View, keine Eigenberechnung (ADR-008) |
+| `list_views.V_LIST_G15_VAT_STATEMENT` | Anzeige-View fuer Abrechnungskopf |
+| `list_views.V_LIST_G15_VAT_STATEMENT_ITEM` | Anzeige-View fuer Abrechnungspositionen |
+| `dbo.T_USER` / `dbo.fn_get_user_securitylevel` | APP-lesbare Demo-User und zentrale Security-Level-Function; in ERPDEV26S gibt es aktuell keine G15-User-View |
+| `stored_func.fn_G15_check_vat_period` | Prueft Periodenformat, 10.-des-Folgemonats-Regel und Sperrstatus |
+| `stored_func.fn_G15_calculate_vat_balance` | Berechnet `VAT_BALANCE` als Absolutbetrag und `VAT_TYPE` |
+| `stored_proc.sp_G15_create_vat_statement` | Legt Abrechnung an oder berechnet bestehenden `DRAFT` neu |
+| `stored_proc.sp_G15_approve_vat_statement` | Statuswechsel `DRAFT` -> `APPROVED` |
+| `stored_proc.sp_G15_pay_vat_statement` | Statuswechsel `APPROVED` -> `PAID` |
+| `stored_proc.sp_G15_reject_vat_statement` | Rueckgabe `APPROVED` -> `DRAFT` |
 
 Datenquellen (Beschluss 2026-06-16): Umsatzsteuer aus **einer** Quelle `V_LIST_G07_INVOICE` (G7-View ueber `dbo.T_INVOICE`; G9 Bar Rosenberg und G10 Bar Freiburg schreiben ueber dieselbe Tabelle und laufen darueber mit); Vorsteuer aus G4 (Wareneingaenge); finaler Steuerbetrag nach Skonto aus G8 (Zahlungseingaenge), der den Rechnungsbetrag ueberschreibt (ADR-010). Wir lesen `RechnungsID`, `RechnungsDatum`, `Steuerbetrag` direkt aus den Partner-Lese-Views, keine Eigenberechnung. Details und aktueller Lieferstand: `docs/zielbild.md`, `docs/schnittstellen_annahmen.md`.
 
@@ -105,7 +104,7 @@ Verbindliche DB-Regeln:
 - Geschaeftslogik liegt moeglichst in Stored Functions/Procedures, nicht im Frontend.
 - HdM-Namenskonventionen strikt einhalten: Tabellen und Tabellenspalten UPPER_CASE, Procedures/Functions klein mit `sp_`/`fn_`, Views mit `LOV_`, `V_LIST_`, `V_INS_`, `V_UPD_`.
 - `VAT_BALANCE` ist immer ein nicht-negativer Absolutbetrag; `VAT_TYPE` unterscheidet `ZAHLLAST`, `UEBERHANG`, `NEUTRAL`.
-- Abgeschlossene oder freigegebene Abrechnungen duerfen nicht neu berechnet werden; nur `DRAFT` darf durch `sp_create_vat_statement` ersetzt werden.
+- Abgeschlossene oder freigegebene Abrechnungen duerfen nicht neu berechnet werden; nur `DRAFT` darf durch `stored_proc.sp_G15_create_vat_statement` ersetzt werden.
 - Eine Periode darf nur einmal existieren (`VAT_PERIOD` eindeutig). Bestehende Sandbox-/DEV-Instanzen werden ueber idempotente Constraint-Skripte nachgezogen.
 - Status-Procedures pruefen Rollen ueber `T_CODE_NEXT.SECURITY_LEVEL` und `T_USER.SECURITYLEVEL`: Sachbearbeiter `1`, Leitung FiBu `2`, CFO `3`.
 
@@ -113,16 +112,17 @@ Verbindliche DB-Regeln:
 
 Streamlit findet die Seiten automatisch unter `app/pages/`.
 
-1. `app/main.py` initialisiert die App und erklaert die Navigation.
-2. `app/pages/1_Übersicht.py` zeigt bestehende Abrechnungen mit Statusfilter und Kennzahlen.
-3. `app/pages/2_Neue_Abrechnung.py` legt eine Periode ueber `stored_proc.sp_create_vat_statement` an oder berechnet einen `DRAFT` neu. Der Default ist die letzte nach 10.-des-Folgemonats-Regel abrechenbare Periode.
-4. `app/pages/3_Detail.py` zeigt Kopf und Items, Audit-Spuren und ruft die Status-Procedures mit passenden Demo-Rollen auf.
-5. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe, liest aus Anzeige-Views und nutzt `get_active_conn()`.
-6. `app/db.py` liest `.env`, stellt App-, Dev- und Sandbox-Verbindungen bereit und waehlt die aktive App-Verbindung ueber `APP_DB_PROFILE`.
+1. `app/main.py` rendert die mockup-nahe Hauptseite/Übersicht.
+2. `app/pages/1_Übersicht.py` rendert dieselbe Übersicht fuer Streamlit-Multipage-Navigation.
+3. `app/pages/2_Neue_Abrechnung.py` leitet Perioden aus Quellbelegen, bestehenden Abrechnungen und `stored_func.fn_G15_check_vat_period` ab und legt ueber `stored_proc.sp_G15_create_vat_statement` an.
+4. `app/pages/3_Abrechnung_auswählen.py` zeigt Auswahl, Kopf, Positionen, Verlauf und ruft die `stored_proc.sp_G15_*`-Status-Procedures rollenabhaengig auf.
+5. `app/ui.py` enthaelt nur gemeinsame Darstellung, Formatierung, Dialoge und Navigation.
+6. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe, liest aus den G15-Anzeige-Views und nutzt fuer die UI direkt `get_app_conn()`.
+7. `app/db.py` liest `.env` und stellt App-, Dev- und Sandbox-Verbindungen bereit; die finale App nutzt davon den APP-Zugang.
 
-Nach PR #19 koennen lokale UI-Tests gegen die Sandbox laufen, ohne den Code umzubauen: In `.env` `APP_DB_PROFILE=sandbox` setzen, Sandbox deployen und dann `streamlit run app/main.py` starten.
+Die Sandbox ist fuer die finale UI nicht mehr Laufzeitbasis. Lokale UI-Pruefung erfolgt gegen den vorgesehenen APP-Zugang auf `ERPDEV26S`.
 
-Die UI enthaelt weiterhin keine echte Authentifizierung. Sie bietet aber Demo-User je Rolle aus `list_views.V_LIST_VAT_USER` an; die verbindliche Rollenpruefung liegt in den Stored Procedures.
+Die UI enthaelt weiterhin keine echte Authentifizierung. Sie ordnet die Dropdowns `Fachkraft 1/2/3` den APP-lesbaren Demo-Usern `fachb1/2/3` aus `dbo.T_USER` zu; die verbindliche Rollenpruefung liegt in den Stored Procedures.
 
 ## Deployment und Sandbox
 
@@ -170,6 +170,9 @@ Aus der Git-Historie dauerhaft relevant:
 
 - Partner-Lieferstand 2026-06-16 gegen ERPDEV26S: G7 (`V_LIST_G07_INVOICE`) aktiv, aber deutsche Spaltennamen (Mapping in unserer View) und **nur Fernabsatz** — die View filtert ueber INNER JOINs auf die Angebot->Auftrag->Lieferung-Kette, B2C-Barverkaeufe (G9/G10) fehlen noch (78 von 156 G9-Rechnungen sichtbar). G7 muss die View auf alle `T_INVOICE`-Rechnungen erweitern. G4 weiterhin ohne View (`V_LIST_INPUT_VAT` Stub). G8 (`V_LIST_G08_PAYMENT_RECEIPT`) ohne finalen `TAX_AMOUNT`/`IS_SKONTO` (`V_LIST_VAT_SKONTO` Stub). Bring-Schulden als Issues #24-#28 dokumentiert.
 - Status-Workflow haengt zur Laufzeit an `dbo.fn_chk_status_folge` (in ERPDEV vorhanden, in der lokalen Sandbox nicht). Vollstaendiger Workflow-Test nur gegen ERPDEV26S.
+- APP-Schreibtest 2026-06-27: Die live vorhandenen G15-Procedures in ERPDEV26S wurden auf `dbo.fn_get_user_securitylevel` sowie die vorhandenen `list_views.V_LIST_G15_*`-/`stored_func.fn_G15_*`-Objekte korrigiert. Anlage, Freigabe, Rueckweisung und Bezahlung liefen ueber den APP-Zugang in einer Rollback-Transaktion erfolgreich.
+- APP-Rechte nach DEV-DB-Kopie 2026-06-27: `ERP_REMOTE_USER` benoetigt `EXECUTE` auf `stored_func.fn_G15_check_vat_period` und die vier `stored_proc.sp_G15_*`-Procedures sowie `SELECT` auf `stored_func.fn_G15_calculate_vat_balance` (table-valued Function). Diese Grants wurden nachgezogen.
+- Append-only Verlauf ist DB-seitig noch offen: Es gibt keine VAT-spezifische Historientabelle und G15 hat kein `CREATE TABLE`-/`dbo ALTER`-Recht. Die UI liest defensiv `list_views.V_LIST_G15_VAT_STATEMENT_HISTORY` bzw. `dbo.T_G15_VAT_STATEMENT_HISTORY`, falls der Architekt die saubere Historie anlegt; bis dahin bleiben nur aktuelle Audit-Spalten als Fallback.
 - Rollenpruefungen in den Status-Procedures sind technisch umgesetzt, ersetzen aber keine echte Authentifizierung im Streamlit-Prototyp.
 - `ins_views`/`upd_views` sind als Ordner vorgesehen, aber aktuell nicht implementiert und moeglicherweise durch Stored Procedures ersetzbar.
 - Eine automatisierte pytest-Suite fehlt noch.
