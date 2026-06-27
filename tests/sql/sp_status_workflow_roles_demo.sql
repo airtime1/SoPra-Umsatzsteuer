@@ -19,7 +19,7 @@ BEGIN TRY
 
     DECLARE @statement TABLE (VAT_STATEMENT_ID INT);
     INSERT INTO @statement
-    EXEC stored_proc.sp_create_vat_statement
+    EXEC stored_proc.sp_G15_create_vat_statement
         @vat_period = '2026-03',
         @created_by = @clerk;
 
@@ -29,7 +29,7 @@ BEGIN TRY
     DECLARE @recreate_paid_result VARCHAR(10) = 'FAIL';
 
     BEGIN TRY
-        EXEC stored_proc.sp_approve_vat_statement
+        EXEC stored_proc.sp_G15_approve_vat_statement
             @statement_id = @statement_id,
             @approved_by = @clerk;
     END TRY
@@ -37,12 +37,12 @@ BEGIN TRY
         IF ERROR_NUMBER() = 50021 SET @approve_wrong_result = 'PASS';
     END CATCH;
 
-    EXEC stored_proc.sp_approve_vat_statement
+    EXEC stored_proc.sp_G15_approve_vat_statement
         @statement_id = @statement_id,
         @approved_by = @cfo;
 
     BEGIN TRY
-        EXEC stored_proc.sp_pay_vat_statement
+        EXEC stored_proc.sp_G15_pay_vat_statement
             @statement_id = @statement_id,
             @paid_by = @cfo;
     END TRY
@@ -50,14 +50,14 @@ BEGIN TRY
         IF ERROR_NUMBER() = 50021 SET @pay_wrong_result = 'PASS';
     END CATCH;
 
-    EXEC stored_proc.sp_pay_vat_statement
+    EXEC stored_proc.sp_G15_pay_vat_statement
         @statement_id = @statement_id,
         @paid_by = @fibu;
 
     BEGIN TRY
         DECLARE @second_statement TABLE (VAT_STATEMENT_ID INT);
         INSERT INTO @second_statement
-        EXEC stored_proc.sp_create_vat_statement
+        EXEC stored_proc.sp_G15_create_vat_statement
             @vat_period = '2026-03',
             @created_by = @clerk;
     END TRY

@@ -1,5 +1,5 @@
 -- ============================================================
--- stored_func.fn_check_vat_period
+-- stored_func.fn_G15_check_vat_period
 -- Prueft, ob fuer die uebergebene Periode eine Abrechnung
 -- erzeugt/ueberschrieben werden darf.
 --
@@ -15,7 +15,7 @@
 --   1 = Periode noch nicht abrechenbar (zu frueh)
 --   2 = Abrechnung existiert und ist gesperrt (APPROVED/PAID)
 
-CREATE OR ALTER FUNCTION stored_func.fn_check_vat_period
+CREATE OR ALTER FUNCTION stored_func.fn_G15_check_vat_period
 (
     @vat_period  CHAR(7),     -- 'YYYY-MM'
     @check_date  DATE         -- i. d. R. CAST(GETDATE() AS DATE)

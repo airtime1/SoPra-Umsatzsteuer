@@ -14,8 +14,8 @@ Umsatzsteuerabrechnung relevant sind:
 - Gruppe 4 (Wareneingaenge) — Vorsteuer
 - Gruppe 8 (Zahlungseingaenge) — Umsatzsteuer-Korrektur (Skonto)
 
-In einer fruehen Implementierungsphase haben wir in `V_LIST_OUTPUT_VAT` und
-`V_LIST_INPUT_VAT` versucht, Steuerbetraege selbst zu berechnen, indem wir aus
+In einer fruehen Implementierungsphase haben wir in `V_LIST_G15_OUTPUT_VAT` und
+`V_LIST_G15_INPUT_VAT` versucht, Steuerbetraege selbst zu berechnen, indem wir aus
 `T_INVOICE_ITEM`, `T_SUPPLIER_INVOICE_ITEM` und `T_MATERIAL` mit COALESCE-
 Kaskaden und Dynamic-SQL einen Steuerbetrag rekonstruiert haben. Beim Skonto
 haben wir den Steueranteil aus `DIFFERENCE_AMOUNT × (TAX/GROSS)` proportional
@@ -29,7 +29,7 @@ Erzeuger.
 ## Entscheidung
 
 1. **Gruppe 15 berechnet keine Steuerbetraege.** Weder
-   `V_LIST_OUTPUT_VAT` noch `V_LIST_INPUT_VAT` enthalten Berechnungslogik,
+   `V_LIST_G15_OUTPUT_VAT` noch `V_LIST_G15_INPUT_VAT` enthalten Berechnungslogik,
    die einen Steuerbetrag aus Mengen, Preisen oder Prozentsaetzen ableitet.
 
 2. **Wir konsumieren Partner-Lese-Views.** Quelle der Werte ist immer eine
@@ -79,7 +79,7 @@ Positiv:
 - Klare Verantwortungsteilung — die Partner-Gruppe haftet fuer ihre Werte.
 - Sehr kurze, lesbare Views ohne Item-Aggregation und ohne Material-Fallback.
 - Re-Aktivierung von Stub-Quellen ist ein 8-zeiliger Code-Swap, keine Logik-Aenderung.
-- Pruefbar fuer den Dozenten: `SELECT * FROM list_views.V_LIST_OUTPUT_VAT` zeigt
+- Pruefbar fuer den Dozenten: `SELECT * FROM list_views.V_LIST_G15_OUTPUT_VAT` zeigt
   sofort, welche Quellen aktiv und welche Stub sind.
 
 Negativ:

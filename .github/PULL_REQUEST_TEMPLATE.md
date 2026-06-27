@@ -14,8 +14,8 @@
 
 <!-- Konkrete Schritte / Befehle.
      Beispiel:
-     - sql/03_stored_func/002_fn_calculate_vat_balance.sql in Sandbox eingespielt
-     - tests/sql/fn_calculate_vat_balance_basic.sql ausgefuehrt -> alle Zeilen PASS
+     - sql/03_stored_func/002_fn_g15_calculate_vat_balance.sql in Sandbox eingespielt
+     - tests/sql/fn_g15_calculate_vat_balance_basic.sql ausgefuehrt -> alle Zeilen PASS
      - Streamlit-UI manuell durchgeklickt -->
 
 ## Risiken / Nebenwirkungen

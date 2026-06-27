@@ -13,7 +13,7 @@ Dieser Ordner sammelt Testfall-Katalog, Abnahmekriterien und ausführbare SQL-Te
 
 | Ebene | Was getestet wird | Wie |
 |---|---|---|
-| Unit | Stored Functions isoliert (`fn_check_vat_period`, `fn_calculate_vat_balance`) | SQL-Tests in `sql/` |
+| Unit | Stored Functions isoliert (`fn_G15_check_vat_period`, `fn_G15_calculate_vat_balance`) | SQL-Tests in `sql/` |
 | Modul | Stored Procedures gegen Testdaten in Sandbox | SQL-Tests in `sql/` |
 | Integration | Frontend → SP → DB → Frontend | manuell + Screenshots |
 | Abnahme | Akzeptanzkriterien SPC-1..9 | manueller Durchlauf |
@@ -29,6 +29,6 @@ Dieser Ordner sammelt Testfall-Katalog, Abnahmekriterien und ausführbare SQL-Te
 
 | Datei | Deckt ab |
 |---|---|
-| `tests/sql/fn_calculate_vat_balance_basic.sql` | Saldo- und Typberechnung (`ZAHLLAST`, `UEBERHANG`, `NEUTRAL`) |
-| `tests/sql/sp_create_vat_statement_demo.sql` | Anlage einer Demo-Abrechnung, vollständige Belegübernahme, optionale Skonto-/Schnittstellenprüfung |
+| `tests/sql/fn_g15_calculate_vat_balance_basic.sql` | Saldo- und Typberechnung (`ZAHLLAST`, `UEBERHANG`, `NEUTRAL`) |
+| `tests/sql/sp_g15_create_vat_statement_demo.sql` | Anlage einer Demo-Abrechnung, vollständige Belegübernahme, optionale Skonto-/Schnittstellenprüfung |
 | `tests/sql/sp_status_workflow_roles_demo.sql` | Rollenchecks, Freigabe, Zahlung und Sperre einer bezahlten Periode |

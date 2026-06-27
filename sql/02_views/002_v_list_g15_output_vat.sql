@@ -1,5 +1,5 @@
 -- ============================================================
--- list_views.V_LIST_OUTPUT_VAT
+-- list_views.V_LIST_G15_OUTPUT_VAT
 -- Alle umsatzsteuerrelevanten Ausgangsrechnungen einer Periode.
 -- ============================================================
 -- Konvention (ADR-008): G15 berechnet keine Steuerbetraege.
@@ -15,7 +15,7 @@
 -- Skonto wird NICHT mehr hier als Korrektur-Zeile gefuehrt
 -- (loest ADR-005 ab, siehe ADR-010): die Skonto-Korrektur
 -- ueberschreibt den finalen Steuerbetrag der Rechnung erst in
--- stored_proc.sp_create_vat_statement, Quelle list_views.V_LIST_VAT_SKONTO.
+-- stored_proc.sp_G15_create_vat_statement, Quelle list_views.V_LIST_G15_VAT_SKONTO.
 --
 -- OFFEN (Bring-Schuld G7, Issue #27/#28): V_LIST_G07_INVOICE liefert
 -- aktuell nur Fernabsatz-Rechnungen mit vollstaendiger
@@ -25,7 +25,7 @@
 -- T_INVOICE-Ausgangsrechnungen erscheinen. Bis dahin zaehlt nur
 -- Fernabsatz; unsere Logik bleibt unveraendert.
 
-CREATE OR ALTER VIEW list_views.V_LIST_OUTPUT_VAT
+CREATE OR ALTER VIEW list_views.V_LIST_G15_OUTPUT_VAT
 AS
 SELECT
     CAST('T_INVOICE' AS VARCHAR(50))   AS SOURCE_TABLE,

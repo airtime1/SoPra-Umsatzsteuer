@@ -1,10 +1,10 @@
 -- ============================================================
--- list_views.V_LIST_VAT_STATEMENT_ITEM
+-- list_views.V_LIST_G15_VAT_STATEMENT_ITEM
 -- Anzeige-View fuer die Belegbasis einer Umsatzsteuerabrechnung.
 -- Frontend liest ueber diese View statt direkt aus dbo.
 -- ============================================================
 
-CREATE OR ALTER VIEW list_views.V_LIST_VAT_STATEMENT_ITEM
+CREATE OR ALTER VIEW list_views.V_LIST_G15_VAT_STATEMENT_ITEM
 AS
 SELECT
     VAT_STATEMENT_ITEM_ID,

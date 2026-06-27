@@ -1,12 +1,12 @@
 -- ============================================================
--- stored_proc.sp_pay_vat_statement
+-- stored_proc.sp_G15_pay_vat_statement
 -- APPROVED -> PAID. Aufrufer: Leitung FiBu (Stufe 2).
 -- Stellt PAID dar als "ausgezahlt / Vorgang abgeschlossen".
 -- ------------------------------------------------------------
 -- Transitionspruefung ueber die zentrale Architekten-Function
 -- dbo.fn_chk_status_folge (liest dbo.T_CODE_NEXT).
 -- ============================================================
-CREATE OR ALTER PROCEDURE stored_proc.sp_pay_vat_statement
+CREATE OR ALTER PROCEDURE stored_proc.sp_G15_pay_vat_statement
     @statement_id INT,
     @paid_by      VARCHAR(50)
 AS
@@ -34,7 +34,7 @@ BEGIN
         WHERE CODE_ID = @old_id AND CODE_NEXT_ID = @new_id
     );
 
-    DECLARE @actual_security_level INT = stored_func.fn_get_user_security_level(@paid_by);
+    DECLARE @actual_security_level INT = dbo.fn_get_user_securitylevel(@paid_by);
     IF @actual_security_level IS NULL
     BEGIN
         THROW 50020, 'Unbekannter Benutzer fuer Umsatzsteuerabrechnung.', 1;

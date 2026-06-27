@@ -100,7 +100,7 @@ git pull --ff-only
 git checkout -b feat/<kurz-beschreibung>
 
 # arbeiten, oft committen mit Conventional Commits
-git commit -m "feat(stored-proc): sp_pay_vat_statement"
+git commit -m "feat(stored-proc): sp_G15_pay_vat_statement"
 
 # pushen, PR auf GitHub aufmachen
 git push -u origin feat/<kurz-beschreibung>

@@ -40,7 +40,7 @@ def list_statements() -> pd.DataFrame:
                CREATED_BY, CREATED_AT,
                APPROVED_BY, APPROVED_AT,
                CLOSED_BY, CLOSED_AT
-        FROM list_views.V_LIST_VAT_STATEMENT
+        FROM list_views.V_LIST_G15_VAT_STATEMENT
         ORDER BY VAT_PERIOD DESC
     """
     with get_active_conn() as conn:
@@ -53,7 +53,7 @@ def get_statement_items(statement_id: int) -> pd.DataFrame:
                SOURCE_INVOICE_DATE, TAX_AMOUNT,
                IS_CORRECTION, ORIGINAL_INVOICE_ID,
                CREATED_BY, CREATED_AT
-        FROM list_views.V_LIST_VAT_STATEMENT_ITEM
+        FROM list_views.V_LIST_G15_VAT_STATEMENT_ITEM
         WHERE VAT_STATEMENT_ID = ?
         ORDER BY SOURCE_INVOICE_DATE, SOURCE_TABLE, SOURCE_INVOICE_ID
     """
@@ -65,7 +65,7 @@ def list_users() -> pd.DataFrame:
     """Benutzer fuer Demo-/Rollensteuerung ohne Passwortdaten."""
     sql = """
         SELECT USERNAME, SECURITYLEVEL, VAT_ROLE
-        FROM list_views.V_LIST_VAT_USER
+        FROM list_views.V_LIST_G15_VAT_USER
         WHERE SECURITYLEVEL IN (1, 2, 3)
         ORDER BY SECURITYLEVEL, USERNAME
     """
@@ -74,11 +74,11 @@ def list_users() -> pd.DataFrame:
 
 
 def create_statement(period: str, created_by: str) -> int:
-    """Ruft stored_proc.sp_create_vat_statement auf. Gibt die neue ID zurueck."""
+    """Ruft stored_proc.sp_G15_create_vat_statement auf. Gibt die neue ID zurueck."""
     with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.sp_create_vat_statement @vat_period = ?, @created_by = ?",
+            "EXEC stored_proc.sp_G15_create_vat_statement @vat_period = ?, @created_by = ?",
             period,
             created_by,
         )
@@ -88,11 +88,11 @@ def create_statement(period: str, created_by: str) -> int:
 
 
 def approve_statement(statement_id: int, approved_by: str) -> None:
-    """DRAFT -> APPROVED via stored_proc.sp_approve_vat_statement."""
+    """DRAFT -> APPROVED via stored_proc.sp_G15_approve_vat_statement."""
     with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.sp_approve_vat_statement @statement_id = ?, @approved_by = ?",
+            "EXEC stored_proc.sp_G15_approve_vat_statement @statement_id = ?, @approved_by = ?",
             statement_id,
             approved_by,
         )
@@ -100,11 +100,11 @@ def approve_statement(statement_id: int, approved_by: str) -> None:
 
 
 def reject_statement(statement_id: int, rejected_by: str) -> None:
-    """APPROVED -> DRAFT via stored_proc.sp_reject_vat_statement."""
+    """APPROVED -> DRAFT via stored_proc.sp_G15_reject_vat_statement."""
     with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.sp_reject_vat_statement @statement_id = ?, @rejected_by = ?",
+            "EXEC stored_proc.sp_G15_reject_vat_statement @statement_id = ?, @rejected_by = ?",
             statement_id,
             rejected_by,
         )
@@ -112,11 +112,11 @@ def reject_statement(statement_id: int, rejected_by: str) -> None:
 
 
 def pay_statement(statement_id: int, paid_by: str) -> None:
-    """APPROVED -> PAID via stored_proc.sp_pay_vat_statement."""
+    """APPROVED -> PAID via stored_proc.sp_G15_pay_vat_statement."""
     with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.sp_pay_vat_statement @statement_id = ?, @paid_by = ?",
+            "EXEC stored_proc.sp_G15_pay_vat_statement @statement_id = ?, @paid_by = ?",
             statement_id,
             paid_by,
         )
