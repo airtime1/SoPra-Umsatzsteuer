@@ -1,5 +1,5 @@
 -- ============================================================
--- stored_proc.sp_reject_vat_statement
+-- stored_proc.sp_G15_reject_vat_statement
 -- APPROVED -> DRAFT (Rueckgabe / Zurueckweisung).
 -- Aufrufer: CFO (Stufe 3).
 -- Setzt APPROVED_BY/_AT zurueck, damit beim naechsten Freigeben
@@ -8,7 +8,7 @@
 -- Transitionspruefung ueber die zentrale Architekten-Function
 -- dbo.fn_chk_status_folge (liest dbo.T_CODE_NEXT).
 -- ============================================================
-CREATE OR ALTER PROCEDURE stored_proc.sp_reject_vat_statement
+CREATE OR ALTER PROCEDURE stored_proc.sp_G15_reject_vat_statement
     @statement_id INT,
     @rejected_by  VARCHAR(50)
 AS
@@ -36,7 +36,7 @@ BEGIN
         WHERE CODE_ID = @old_id AND CODE_NEXT_ID = @new_id
     );
 
-    DECLARE @actual_security_level INT = stored_func.fn_get_user_security_level(@rejected_by);
+    DECLARE @actual_security_level INT = dbo.fn_get_user_securitylevel(@rejected_by);
     IF @actual_security_level IS NULL
     BEGIN
         THROW 50020, 'Unbekannter Benutzer fuer Umsatzsteuerabrechnung.', 1;

@@ -1,10 +1,10 @@
 -- ============================================================
--- list_views.V_LIST_VAT_USER
+-- list_views.V_LIST_G15_VAT_USER
 -- Minimale User-/Rollen-View fuer die Umsatzsteuer-App.
 -- Keine Passwoerter, nur Login und Security-Level.
 -- ============================================================
 
-CREATE OR ALTER VIEW list_views.V_LIST_VAT_USER
+CREATE OR ALTER VIEW list_views.V_LIST_G15_VAT_USER
 AS
 SELECT
     USERNAME,

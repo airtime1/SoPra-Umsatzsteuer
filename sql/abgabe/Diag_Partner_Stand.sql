@@ -80,13 +80,13 @@ WHERE (
         (s.name IN ('list_views','stored_func','stored_proc')
          AND o.name IN (
             'LOV_VAT_STATUS',
-            'V_LIST_OUTPUT_VAT','V_LIST_INPUT_VAT',
-            'V_LIST_VAT_STATEMENT','V_LIST_VAT_STATEMENT_ITEM','V_LIST_VAT_USER',
-            'fn_check_vat_period','fn_calculate_vat_balance','fn_get_user_security_level',
-            'sp_create_vat_statement','sp_approve_vat_statement',
-            'sp_pay_vat_statement','sp_reject_vat_statement'))
+            'V_LIST_G15_OUTPUT_VAT','V_LIST_G15_INPUT_VAT',
+            'V_LIST_G15_VAT_STATEMENT','V_LIST_G15_VAT_STATEMENT_ITEM','V_LIST_G15_VAT_USER',
+            'fn_G15_check_vat_period','fn_G15_calculate_vat_balance',
+            'sp_G15_create_vat_statement','sp_G15_approve_vat_statement',
+            'sp_G15_pay_vat_statement','sp_G15_reject_vat_statement'))
       OR (s.name = 'dbo'
-         AND o.name IN ('T_VAT_STATEMENT','T_VAT_STATEMENT_ITEM','fn_chk_status_folge'))
+         AND o.name IN ('T_VAT_STATEMENT','T_VAT_STATEMENT_ITEM','fn_chk_status_folge','fn_get_user_securitylevel'))
       )
 ORDER BY s.name, o.type_desc, o.name;
 
@@ -186,12 +186,12 @@ JOIN sys.schemas s ON s.schema_id = o.schema_id
 WHERE (
         (s.name IN ('list_views','stored_func','stored_proc')
          AND o.name IN (
-            'LOV_VAT_STATUS','V_LIST_OUTPUT_VAT','V_LIST_VAT_SKONTO',
-            'V_LIST_INPUT_VAT','V_LIST_VAT_STATEMENT','V_LIST_VAT_STATEMENT_ITEM',
-            'V_LIST_VAT_USER','fn_check_vat_period','fn_calculate_vat_balance',
-            'fn_get_user_security_level','sp_create_vat_statement',
-            'sp_approve_vat_statement','sp_pay_vat_statement','sp_reject_vat_statement'))
+            'LOV_VAT_STATUS','V_LIST_G15_OUTPUT_VAT','V_LIST_G15_VAT_SKONTO',
+            'V_LIST_G15_INPUT_VAT','V_LIST_G15_VAT_STATEMENT','V_LIST_G15_VAT_STATEMENT_ITEM',
+            'V_LIST_G15_VAT_USER','fn_G15_check_vat_period','fn_G15_calculate_vat_balance',
+            'sp_G15_create_vat_statement',
+            'sp_G15_approve_vat_statement','sp_G15_pay_vat_statement','sp_G15_reject_vat_statement'))
       OR (s.name = 'dbo'
-          AND o.name IN ('T_VAT_STATEMENT','T_VAT_STATEMENT_ITEM','fn_chk_status_folge'))
+          AND o.name IN ('T_VAT_STATEMENT','T_VAT_STATEMENT_ITEM','fn_chk_status_folge','fn_get_user_securitylevel'))
       )
 ORDER BY s.name, o.type_desc, o.name;

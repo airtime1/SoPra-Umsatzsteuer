@@ -32,4 +32,4 @@ Begründung:
 - Schnittstellen-Anforderung an Gruppen 4/7/8: Korrekturen werden als separate Belegzeilen geliefert, nicht durch Mutation der Ursprungsrechnung. (Dies muss mit den Gruppen abgestimmt werden — siehe `docs/offene_fragen.md`.)
 - `T_VAT_STATEMENT_ITEM`-Skript: `IS_CORRECTION BIT NOT NULL DEFAULT 0`, `ORIGINAL_INVOICE_ID INT NULL` (nullable, weil Originalrechnungen keine Referenz haben).
 - Constraint-Idee: Wenn `IS_CORRECTION = 1`, muss `ORIGINAL_INVOICE_ID IS NOT NULL`.
-- In `stored_proc.sp_create_vat_statement` muss die Logik beide Quellen (Original-Rechnungen + Korrekturen) in derselben Periode einsammeln.
+- In `stored_proc.sp_G15_create_vat_statement` muss die Logik beide Quellen (Original-Rechnungen + Korrekturen) in derselben Periode einsammeln.

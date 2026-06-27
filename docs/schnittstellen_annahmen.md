@@ -1,6 +1,6 @@
 # Schnittstellen und Annahmen
 
-Stand: 2026-06-16
+Stand: 2026-06-23
 
 Dieses Dokument fasst die Annahmen ueber Partner-Schnittstellen und den
 Konsum-Mechanismus des Umsatzsteuer-Moduls zusammen. Es enthaelt keine
@@ -14,9 +14,9 @@ den Partner-Lese-Views im Schema `list_views`.
 
 | Quell-Gruppe | Inhalt | Erwartete Partner-View | Erwartetes Feld |
 |---|---|---|---|
-| G4 — Wareneingaenge | Vorsteuer | `list_views.V_LIST_G04_SUPPLIER_INVOICE` | `TAX_AMOUNT` |
+| G4 — Lieferantenrechnungen | Vorsteuer | `list_views.V_LIST_SUPPLIER_INVOICE` | `TOTAL_VAT_AMOUNT`, `INVOICE_ID`, `INVOICE_DATE` |
 | G7 — alle Ausgangsrechnungen | Umsatzsteuer | `list_views.V_LIST_G07_INVOICE` | `BetragUstEUR` (heutiger Name) |
-| G8 — Zahlungseingang | finaler Steuerbetrag (Skonto) | `list_views.V_LIST_G08_PAYMENT_RECEIPT` | `INVOICE_ID`, `TAX_AMOUNT` (final), `IS_SKONTO` |
+| G8 — Zahlungseingang | finaler Steuerbetrag (Skonto) | `list_views.V_LIST_G08_PAYMENT_RECEIPT` | `INVOICE_ID`, finaler Steuerbetrag (fehlt noch), `SKONTO_BERECHTIGT_YN` (Flag da) |
 
 Steuerlich relevant ist das jeweilige Rechnungs- bzw. Belegdatum.
 Status-Filter werden nicht angewendet — die Partner-View ist verantwortlich
@@ -37,26 +37,27 @@ den *finalen* Steuerbetrag der Rechnung nach Skonto plus `IS_SKONTO` (Y/N),
 keinen separaten Korrekturbetrag mehr. Wir ueberschreiben damit den
 urspruenglichen `TAX_AMOUNT` der Rechnung (Match ueber `INVOICE_ID`).
 
-## Aktueller Lieferstand der Partner (Diagnose 2026-06-16 gegen ERPDEV26S)
+## Aktueller Lieferstand der Partner (Diagnose 2026-06-23 gegen ERPDEV26S)
 
 | Partner | Status | Wirkung |
 |---|---|---|
-| G7 | View deployed, Spalten deutsch (`BetragUstEUR`, `RechnungsDatum`). Liefert aktuell nur Fernabsatz (INNER-JOIN-Kette). | AKTIV in `V_LIST_OUTPUT_VAT`. Mapping deutsch -> englisch im SELECT. B2C noch nicht enthalten. |
+| G7 | View deployed, Spalten deutsch (`BetragUstEUR`, `RechnungsDatum`). Liefert aktuell nur Fernabsatz (INNER-JOIN-Kette), 83 von 161 G9-Rechnungen sichtbar. | AKTIV in `V_LIST_G15_OUTPUT_VAT`. Mapping deutsch -> englisch im SELECT. B2C noch nicht enthalten. |
 | G9 / G10 | B2C-Views vorhanden, sollen aber ueber `V_LIST_G07_INVOICE` mitlaufen. | Keine eigene Quelle mehr; abhaengig von G7-View-Erweiterung. |
-| G4 | Keine `V_LIST_G04_*`-View vorhanden. | STUB in `V_LIST_INPUT_VAT`. Aktivierung nach Lieferung. |
-| G8 | View deployed (`V_LIST_G08_PAYMENT_RECEIPT`), finaler `TAX_AMOUNT` + `IS_SKONTO` fehlen noch. | STUB in `V_LIST_VAT_SKONTO`. Aktivierung nach Lieferung. |
+| G4 | View `V_LIST_SUPPLIER_INVOICE` seit 23.06. deployed (UPPER_SNAKE, mit `TOTAL_VAT_AMOUNT`), aber noch 0 Datenzeilen. | AKTIV in `V_LIST_G15_INPUT_VAT` (`TOTAL_VAT_AMOUNT -> TAX_AMOUNT`). Liefert Zeilen, sobald G4 Daten einspielt. |
+| G8 | View deployed (`V_LIST_G08_PAYMENT_RECEIPT`); Skonto-Flag `SKONTO_BERECHTIGT_YN` seit 23.06. da, finaler Steuerbetrag nach Skonto fehlt noch. | STUB in `V_LIST_G15_VAT_SKONTO`. Aktivierung erst, wenn finaler Steuerbetrag geliefert wird. |
 
 ## Eigene Konsumenten-Views
 
-- `list_views.V_LIST_OUTPUT_VAT` — alle Ausgangsrechnungen aus G7
+- `list_views.V_LIST_G15_OUTPUT_VAT` — alle Ausgangsrechnungen aus G7
   (eine Quelle, kein UNION mehr).
-- `list_views.V_LIST_VAT_SKONTO` — finaler Steuerbetrag je Rechnung aus G8
-  (Skonto). Wird in `sp_create_vat_statement` zum Ueberschreiben genutzt
+- `list_views.V_LIST_G15_VAT_SKONTO` — finaler Steuerbetrag je Rechnung aus G8
+  (Skonto). Wird in `sp_G15_create_vat_statement` zum Ueberschreiben genutzt
   (ADR-010). Aktuell Stub.
-- `list_views.V_LIST_INPUT_VAT` — Vorsteuer aus G4 (aktuell Stub).
-- `list_views.V_LIST_VAT_STATEMENT`, `V_LIST_VAT_STATEMENT_ITEM` — Anzeige-
+- `list_views.V_LIST_G15_INPUT_VAT` — Vorsteuer aus G4
+  (`V_LIST_SUPPLIER_INVOICE`, AKTIV seit 23.06.; 0 Zeilen bis G4 Daten hat).
+- `list_views.V_LIST_G15_VAT_STATEMENT`, `V_LIST_G15_VAT_STATEMENT_ITEM` — Anzeige-
   Views auf unsere eigenen Tabellen.
-- `list_views.V_LIST_VAT_USER` — Login + Rolle (kein Passwort).
+- `list_views.V_LIST_G15_VAT_USER` — Login + Rolle (kein Passwort).
 
 ## Stub-Pattern (technisch)
 
@@ -84,9 +85,10 @@ Block durch den im Kommentar bereitgestellten echten SELECT ersetzt.
 
 ## Offene Punkte / Bring-Schulden
 
-- **G4** muss eine Lese-View `list_views.V_LIST_G04_SUPPLIER_INVOICE` mit
-  Spalten `INVOICE_ID, INVOICE_DATE, TAX_AMOUNT` (UPPER_SNAKE, HdM-Konvention)
-  bereitstellen.
+- **G4** hat die Lese-View `list_views.V_LIST_SUPPLIER_INVOICE` mit
+  `INVOICE_ID, INVOICE_DATE, TOTAL_VAT_AMOUNT` (UPPER_SNAKE) seit 23.06.
+  geliefert (in `V_LIST_G15_INPUT_VAT` konsumiert). Offen nur noch: G4 muss
+  Rechnungsdaten einspielen (View aktuell 0 Zeilen).
 - **G7** muss `V_LIST_G07_INVOICE` so erweitern, dass **alle** Ausgangs-
   rechnungen aus `T_INVOICE` erscheinen — auch B2C-Barverkaeufe (G9/G10)
   ohne vollstaendige Angebot->Auftrag->Lieferung-Kette. Aktuell filtern die
@@ -94,9 +96,10 @@ Block durch den im Kommentar bereitgestellten echten SELECT ersetzt.
   sichtbar). Mittelfristig zusaetzlich UPPER_SNAKE
   (`RechnungsDatum -> INVOICE_DATE`, `BetragUstEUR -> TAX_AMOUNT`);
   solange mappen wir im SELECT.
-- **G8** muss in `V_LIST_G08_PAYMENT_RECEIPT` je Zahlungseingang den
-  finalen Steuerbetrag der Rechnung (`TAX_AMOUNT` nach Skonto), die
-  Rechnungsnummer (`INVOICE_ID`) und `IS_SKONTO` (Y/N) liefern (ADR-010).
+- **G8** hat in `V_LIST_G08_PAYMENT_RECEIPT` seit 23.06. das Skonto-Flag
+  `SKONTO_BERECHTIGT_YN` (Y/N), aber noch keinen finalen Steuerbetrag nach
+  Skonto. G8 muss diesen finalen Steuerbetrag je Zahlungseingang (Match ueber
+  `INVOICE_ID`) ergaenzen, damit `V_LIST_G15_VAT_SKONTO` aktiviert werden kann (ADR-010).
 - **Architekt** (Lehmann) muss
   `MS5_G15_ARCHITEKT_dbo.sql` ausfuehren: T_CODE-Eintraege fuer VAT_STATUS,
   T_CODE_NEXT-Eintraege fuer die Uebergaenge und die Tabellen

@@ -36,9 +36,9 @@ Uebergangspruefung zuvor mit einem eigenen 3-fach-JOIN ueber `T_CODE` /
 
 3. **Die Rollenpruefung bleibt eigene Logik.** `fn_chk_status_folge`
    prueft keine Rollen. Wir lesen `SECURITY_LEVEL` weiterhin direkt aus
-   `T_CODE_NEXT` und vergleichen mit `fn_get_user_security_level`.
+   `T_CODE_NEXT` und vergleichen mit `dbo.fn_get_user_securitylevel`.
 
-4. **`sp_create_vat_statement` bleibt unveraendert.** Das Anlegen eines
+4. **`sp_G15_create_vat_statement` bleibt unveraendert.** Das Anlegen eines
    neuen DRAFT ist kein Uebergang in `T_CODE_NEXT` (es gibt keinen
    Von-Status). Die Rollenpruefung dort bleibt fest auf Stufe 1
    (Sachbearbeiter).

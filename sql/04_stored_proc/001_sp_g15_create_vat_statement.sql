@@ -1,24 +1,24 @@
 -- ============================================================
--- stored_proc.sp_create_vat_statement
+-- stored_proc.sp_G15_create_vat_statement
 -- Erzeugt (oder neu berechnet) eine Umsatzsteuerabrechnung
 -- fuer die uebergebene Periode.
 --
 -- Ablauf:
---   1. fn_check_vat_period pruefen.
+--   1. fn_G15_check_vat_period pruefen.
 --   2. Vorhandener DRAFT -> Items loeschen, Kopf zuruecksetzen.
 --      Sonst Kopf neu anlegen.
---   3. Items aus list_views.V_LIST_OUTPUT_VAT (USt) und
---      list_views.V_LIST_INPUT_VAT (VSt) einlesen, gefiltert auf
+--   3. Items aus list_views.V_LIST_G15_OUTPUT_VAT (USt) und
+--      list_views.V_LIST_G15_INPUT_VAT (VSt) einlesen, gefiltert auf
 --      den Abrechnungsmonat.
 --   4. Skonto-Korrektur (ADR-010): finalen Steuerbetrag aus
---      list_views.V_LIST_VAT_SKONTO ueber INVOICE_ID auf die
+--      list_views.V_LIST_G15_VAT_SKONTO ueber INVOICE_ID auf die
 --      erfassten Rechnungs-Items schreiben (kein eigener Beleg,
 --      sondern Ueberschreiben des urspruenglichen TAX_AMOUNT).
---   5. Summen + fn_calculate_vat_balance -> Kopf aktualisieren.
+--   5. Summen + fn_G15_calculate_vat_balance -> Kopf aktualisieren.
 --   6. VAT_STATEMENT_ID zurueckgeben.
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE stored_proc.sp_create_vat_statement
+CREATE OR ALTER PROCEDURE stored_proc.sp_G15_create_vat_statement
     @vat_period  CHAR(7),
     @created_by  VARCHAR(50)
 AS
@@ -26,7 +26,7 @@ BEGIN
     SET NOCOUNT ON;
 
     DECLARE @check_result INT;
-    SET @check_result = stored_func.fn_check_vat_period(@vat_period, CAST(GETDATE() AS DATE));
+    SET @check_result = stored_func.fn_G15_check_vat_period(@vat_period, CAST(GETDATE() AS DATE));
 
     IF @check_result = 1
     BEGIN
@@ -42,7 +42,7 @@ BEGIN
     DECLARE @statement_id INT;
     DECLARE @period_start DATE = CAST(@vat_period + '-01' AS DATE);
     DECLARE @period_end   DATE = EOMONTH(@period_start);
-    DECLARE @creator_security_level INT = stored_func.fn_get_user_security_level(@created_by);
+    DECLARE @creator_security_level INT = dbo.fn_get_user_securitylevel(@created_by);
 
     IF @creator_security_level IS NULL
     BEGIN
@@ -100,7 +100,7 @@ BEGIN
             ISNULL(IS_CORRECTION, 0),
             ORIGINAL_INVOICE_ID,
             @created_by
-        FROM list_views.V_LIST_OUTPUT_VAT
+        FROM list_views.V_LIST_G15_OUTPUT_VAT
         WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end;
 
         -- 3) Items: Vorsteuer (Eingangsrechnungen)
@@ -114,7 +114,7 @@ BEGIN
             ISNULL(IS_CORRECTION, 0),
             ORIGINAL_INVOICE_ID,
             @created_by
-        FROM list_views.V_LIST_INPUT_VAT
+        FROM list_views.V_LIST_G15_INPUT_VAT
         WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end;
 
         -- 3b) Skonto-Korrektur (ADR-010, loest ADR-005 ab)
@@ -131,7 +131,7 @@ BEGIN
             itm.IS_CORRECTION       = 1,                    -- markiert: hier hat Skonto gewirkt
             itm.ORIGINAL_INVOICE_ID = itm.SOURCE_INVOICE_ID -- zeigt auf dieselbe Rechnung (erfuellt Constraint)
         FROM dbo.T_VAT_STATEMENT_ITEM itm
-        JOIN list_views.V_LIST_VAT_SKONTO sk
+        JOIN list_views.V_LIST_G15_VAT_SKONTO sk
           ON sk.INVOICE_ID = itm.SOURCE_INVOICE_ID
         WHERE itm.VAT_STATEMENT_ID = @statement_id
           AND itm.SOURCE_TABLE = 'T_INVOICE'
@@ -158,7 +158,7 @@ BEGIN
         DECLARE @vat_type VARCHAR(20);
 
         SELECT @balance = VAT_BALANCE, @vat_type = VAT_TYPE
-        FROM stored_func.fn_calculate_vat_balance(@output_sum, @input_sum);
+        FROM stored_func.fn_G15_calculate_vat_balance(@output_sum, @input_sum);
 
         UPDATE dbo.T_VAT_STATEMENT
         SET OUTPUT_VAT_TOTAL = @output_sum,
