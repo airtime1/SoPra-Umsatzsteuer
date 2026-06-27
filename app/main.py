@@ -1,39 +1,24 @@
-"""
-Streamlit-Einstieg. Multi-Page-App: Streamlit findet automatisch die
-Dateien unter pages/ und zeigt sie in der Sidebar.
+"""Streamlit-Hauptseite: mockup-nahe Übersicht der Umsatzsteuerabrechnung."""
 
-Start:
-    streamlit run app/main.py
-"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
 
 import streamlit as st
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from app.screens import render_overview
+
+
 st.set_page_config(
-    page_title="Umsatzsteuerabrechnung — SoPra G15",
-    page_icon="📊",
+    page_title="Umsatzsteuerabrechnung",
+    page_icon="%",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-st.title("Umsatzsteuerabrechnung")
-st.caption("SoPra SoSe 2026 — Gruppe 15 — Adventure Bike ERP")
-
-st.markdown(
-    """
-    Dieses Modul sammelt steuerrelevante Eingangs- und Ausgangsbelege je Monat,
-    berechnet Zahllast oder Vorsteuerüberhang und friert die Belegbasis im
-    Status-Workflow revisionsnah ein.
-
-    Nutze die Navigation links:
-
-    - **Übersicht** — alle bisherigen Abrechnungen
-    - **Neue Abrechnung** — Periode anlegen / neu berechnen
-    - **Detail** — Einzelne Abrechnung prüfen, freigeben, abschließen
-    """
-)
-
-st.divider()
-st.subheader("Hinweise")
-st.info(
-    "Für lokale Demo-Tests: `.env` auf `APP_DB_PROFILE=sandbox` setzen, Sandbox deployen "
-    "und die Seed-Daten aus `sql/99_seed/` einspielen."
-)
+render_overview()

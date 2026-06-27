@@ -1,6 +1,7 @@
-"""Neue Abrechnung anlegen oder DRAFT neu berechnen."""
+"""Neue Umsatzsteuerabrechnung ueber die DB-Procedure anlegen."""
 
-from datetime import date
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -10,48 +11,92 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from app import ui
 from app.services import vat
 
-st.title("Neue Abrechnung")
+
+st.set_page_config(
+    page_title="Umsatzsteuerabrechnung · Neue Abrechnung",
+    page_icon="%",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+ui.apply_theme()
+ui.render_sidebar("new")
 
 try:
-    users = vat.list_users()
+    profiles = vat.list_fachkraefte()
+    statements = vat.list_statements()
+    period_options = vat.list_period_options()
 except Exception as exc:
-    st.error(f"Benutzer-/Rollenliste konnte nicht geladen werden: {exc}")
+    ui.show_error_dialog("DB-Zugriff fehlgeschlagen", exc)
     st.stop()
 
-today = date.today()
-# Standardvorschlag: letzte Periode, die nach der 10.-des-Folgemonats-Regel
-# bereits abgerechnet werden darf.
-month_offset = 1 if today.day >= 10 else 2
-default_year = today.year
-default_month = today.month - month_offset
-while default_month <= 0:
-    default_month += 12
-    default_year -= 1
+profile = ui.render_header("Umsatzsteuerabrechnung", profiles)
 
-col1, col2 = st.columns(2)
-with col1:
-    year = st.number_input("Jahr", min_value=2020, max_value=2100, value=default_year, step=1)
-with col2:
-    month = st.number_input("Monat", min_value=1, max_value=12, value=default_month, step=1)
+valid_options = period_options[period_options["CHECK_RESULT"] == 0].copy()
+valid_options = valid_options.sort_values("VAT_PERIOD", ascending=False)
+periods = valid_options["VAT_PERIOD"].astype(str).tolist()
 
-period = f"{int(year):04d}-{int(month):02d}"
-st.write(f"Abrechnungsperiode: **{period}**")
 
-clerks = users[users["SECURITYLEVEL"] == 1]
-if clerks.empty:
-    created_by = st.text_input("Bearbeiter (User-Login)", value="")
-else:
-    created_by = st.selectbox(
-        "Bearbeiter",
-        options=clerks["USERNAME"].tolist(),
-        format_func=lambda user: f"{user} — Sachbearbeiter",
-    )
+def format_period(period: str) -> str:
+    row = valid_options[valid_options["VAT_PERIOD"].astype(str) == str(period)]
+    if row.empty:
+        return str(period)
+    row = row.iloc[0]
+    source_rows = int(row.get("SOURCE_ROWS") or 0)
+    return str(period) if source_rows == 0 else f"{period} · {source_rows} Belege"
 
-if st.button("Abrechnung erstellen / neu berechnen", type="primary"):
+
+with st.container(border=True):
+    ui.card_title("Neue Abrechnung", "file-plus")
+    form_cols = st.columns([0.52, 0.12, 0.24], vertical_alignment="bottom")
+    with form_cols[0]:
+        if periods:
+            selected_period = st.selectbox(
+                "Periode",
+                periods,
+                index=None,
+                placeholder="Periode auswählen",
+                format_func=format_period,
+            )
+        else:
+            selected_period = st.selectbox(
+                "Periode",
+                [],
+                index=None,
+                placeholder="Keine zulässige Periode",
+            )
+
+    create_clicked = False
+    with form_cols[2]:
+        if profile.level == 1:
+            create_clicked = st.button(
+                "Abrechnung anlegen",
+                type="primary",
+                use_container_width=True,
+                disabled=selected_period is None,
+            )
+
+if create_clicked and selected_period:
+    selected_existing = statements[statements["VAT_PERIOD"].astype(str) == str(selected_period)]
+    if not selected_existing.empty:
+        existing_id = int(selected_existing.iloc[0]["VAT_STATEMENT_ID"])
+        ui.existing_statement_dialog(existing_id, str(selected_period))
+        st.stop()
+
     try:
-        new_id = vat.create_statement(period, created_by)
-        st.success(f"Abrechnung erstellt (ID {new_id}). Wechsle auf Detail-Seite zur Prüfung.")
+        check_result = vat.check_period(str(selected_period))
+        if check_result != 0:
+            ui.message_dialog(
+                "Periode nicht zulässig",
+                "Die Datenbanklogik lässt diese Periode aktuell nicht zur Abrechnung zu.",
+            )
+        else:
+            new_id = vat.create_statement(str(selected_period), profile.username)
+            st.session_state["selected_statement_id"] = int(new_id)
+            st.session_state["flash_success"] = "Abrechnung wurde angelegt."
+            st.switch_page("pages/3_Abrechnung_auswählen.py")
     except Exception as exc:
-        st.error(f"Fehlgeschlagen: {exc}")
+        ui.show_error_dialog("Abrechnung konnte nicht angelegt werden", exc)

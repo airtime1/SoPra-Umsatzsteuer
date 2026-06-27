@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 Copy-Item .env.example .env
 # .env öffnen, Credentials eintragen
-# Für lokale UI-Tests gegen die eigene Sandbox: APP_DB_PROFILE=sandbox setzen
+# Die finale Streamlit-App nutzt den APP-Zugang; APP_* Credentials eintragen
 ```
 
 ### 3. Sandbox-DB vorbereiten
@@ -56,11 +56,11 @@ python scripts\deploy_sandbox.py
 streamlit run app\main.py
 ```
 
-Die App nutzt standardmäßig `APP_DB_PROFILE=app` aus `.env`. Für lokale Tests nach dem Sandbox-Deployment kann auf `sandbox` umgeschaltet werden.
+Die finale App nutzt den vorgesehenen APP-Zugang auf `ERPDEV26S` direkt. Sandbox- und Dev-Connection-Helfer bleiben für Deploy-/Analyse-Skripte vorhanden, sind aber nicht die Laufzeitbasis der UI.
 
 ### 5. Demo-Workflow prüfen
 
-- In der App: Übersicht öffnen, neue abrechenbare Periode erstellen, Detailseite prüfen, freigeben, abschließen.
+- In der App: Übersicht öffnen, neue abrechenbare Periode erstellen, `Abrechnung auswählen` prüfen, freigeben, abschließen.
 - Per SQL: Tests aus `tests/sql/` gegen die Sandbox ausführen; die Demo-Tests erwarten in allen Ergebniszeilen `PASS`.
 
 ## Projektstruktur

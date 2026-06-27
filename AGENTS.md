@@ -67,7 +67,7 @@ Arbeitsdokumentation beschreibt immer den aktuellen Soll-Zustand. Veraltete Auss
 - Gemeinsame Entwicklungsdatenbank: `ERPDEV26S`.
 - Eigene Sandbox: persoenliche Datenbank nach Muster `s26s5xx_DATAMART`.
 - Frontend: Python 3.11+, Streamlit, pyodbc, python-dotenv, pandas.
-- Aktive DB-Verbindung der Streamlit-App wird ueber `APP_DB_PROFILE` gesteuert: `app`, `dev` oder `sandbox`.
+- Die finale Streamlit-App nutzt den vorgesehenen APP-Zugang direkt (`get_app_conn()`), nicht die Sandbox. `APP_DB_PROFILE`/`get_active_conn()` existiert noch fuer Legacy-/Hilfszwecke, ist aber nicht mehr die Laufzeitquelle der UI.
 - Tests: SQL-Testskripte gegen Sandbox; pytest ist als geplanter Wrapper in `requirements.txt`, eine Python-Test-Suite ist noch nicht angelegt.
 - Repo-Workflow: GitHub Team-Repo mit Feature-Branches, Pull Requests, mindestens einem Review und Squash-Merge.
 
@@ -120,7 +120,7 @@ Streamlit findet die Seiten automatisch unter `app/pages/`.
 5. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe, liest aus Anzeige-Views und nutzt `get_active_conn()`.
 6. `app/db.py` liest `.env`, stellt App-, Dev- und Sandbox-Verbindungen bereit und waehlt die aktive App-Verbindung ueber `APP_DB_PROFILE`.
 
-Nach PR #19 koennen lokale UI-Tests gegen die Sandbox laufen, ohne den Code umzubauen: In `.env` `APP_DB_PROFILE=sandbox` setzen, Sandbox deployen und dann `streamlit run app/main.py` starten.
+Die Sandbox ist fuer die finale UI nicht mehr Laufzeitbasis. Lokale UI-Pruefung erfolgt gegen den vorgesehenen APP-Zugang auf `ERPDEV26S`.
 
 Die UI enthaelt weiterhin keine echte Authentifizierung. Sie bietet aber Demo-User je Rolle aus `list_views.V_LIST_G15_VAT_USER` an; die verbindliche Rollenpruefung liegt in den Stored Procedures.
 
@@ -170,6 +170,9 @@ Aus der Git-Historie dauerhaft relevant:
 
 - Partner-/Deploy-Stand 2026-06-27 gegen ERPDEV26S: Alle G15-Objekte sind deployt und konsistent benannt (`V_LIST_G15_*`, `fn_G15_*`, `sp_G15_*`; Security ueber `dbo.fn_get_user_securitylevel`); der zwischenzeitliche unvollstaendige Coaching-Rename (kaputte Referenzen) ist per Redeploy behoben. Die dbo-Tabellen `T_VAT_STATEMENT`/`_ITEM` existieren jetzt (vom Architekten angelegt). G7 (`V_LIST_G07_INVOICE`) aktiv, aber deutsche Spaltennamen (Mapping in unserer View) und **nur Fernabsatz** (INNER JOINs Angebot->Auftrag->Lieferung); B2C-Barverkaeufe (G9/G10) fehlen noch. G4 (`V_LIST_SUPPLIER_INVOICE`, `TOTAL_VAT_AMOUNT`) ist angebunden (`V_LIST_G15_INPUT_VAT` aktiv), hat aber noch 0 Datenzeilen. Skonto: G8 hat zwar das Skonto-Flag `SKONTO_BERECHTIGT_YN` (in `V_LIST_G08_PAYMENT_RECEIPT`), aber weiterhin **keinen finalen Steuerbetrag nach Skonto** — und genau den braucht der Ueberschreib-Schritt (ADR-010). Die separate `V_LIST_G08_VAT_CORRECTION` enthaelt nur Ueberzahlungs-Korrekturen als Delta (`Korrekturart='Ueberzahlung'`) und ist dafuer nicht geeignet. Daher bleibt `V_LIST_G15_VAT_SKONTO` Stub; der vorbereitete SELECT (echte Spalten `INVOICE_ID`/`SKONTO_BERECHTIGT_YN`/`STORNO_YN`, Platzhalter fuer den Endbetrag) wird eingesetzt, sobald G8 liefert. Liefert G8 nicht rechtzeitig, laufen Skonto-Betraege bewusst nicht ein (keine Eigenberechnung, ADR-008) — das ist G8s Bring-Schuld (Issue #26). Bring-Schulden als Issues #24-#28 dokumentiert.
 - Status-Workflow haengt zur Laufzeit an `dbo.fn_chk_status_folge` (in ERPDEV vorhanden, in der lokalen Sandbox nicht). Vollstaendiger Workflow-Test nur gegen ERPDEV26S.
+- APP-Schreibtest 2026-06-27: Die live vorhandenen G15-Procedures in ERPDEV26S wurden auf `dbo.fn_get_user_securitylevel` sowie die vorhandenen `list_views.V_LIST_G15_*`-/`stored_func.fn_G15_*`-Objekte korrigiert. Anlage, Freigabe, Rueckweisung und Bezahlung liefen ueber den APP-Zugang in einer Rollback-Transaktion erfolgreich.
+- APP-Rechte nach DEV-DB-Kopie 2026-06-27: `ERP_REMOTE_USER` benoetigt `EXECUTE` auf `stored_func.fn_G15_check_vat_period` und die vier `stored_proc.sp_G15_*`-Procedures sowie `SELECT` auf `stored_func.fn_G15_calculate_vat_balance` (table-valued Function). Diese Grants wurden nachgezogen.
+- Append-only Verlauf ist DB-seitig noch offen: Es gibt keine VAT-spezifische Historientabelle und G15 hat kein `CREATE TABLE`-/`dbo ALTER`-Recht. Die UI liest defensiv `list_views.V_LIST_G15_VAT_STATEMENT_HISTORY` bzw. `dbo.T_G15_VAT_STATEMENT_HISTORY`, falls der Architekt die saubere Historie anlegt; bis dahin bleiben nur aktuelle Audit-Spalten als Fallback.
 - Rollenpruefungen in den Status-Procedures sind technisch umgesetzt, ersetzen aber keine echte Authentifizierung im Streamlit-Prototyp.
 - `ins_views`/`upd_views` sind als Ordner vorgesehen, aber aktuell nicht implementiert und moeglicherweise durch Stored Procedures ersetzbar.
 - Eine automatisierte pytest-Suite fehlt noch.
