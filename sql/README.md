@@ -25,8 +25,8 @@ Gemäß ADR-008 berechnet G15 keine Steuerbeträge. Wir konsumieren TAX_AMOUNT d
 
 - `list_views.V_LIST_G15_OUTPUT_VAT` — eine Quelle: G7 (`V_LIST_G07_INVOICE` über `T_INVOICE`); G9 (Bar Rosenberg) und G10 (Bar Freiburg) laufen über dieselbe Tabelle mit (Beschluss 2026-06-16). Aktuell liefert G7s View nur Fernabsatz, B2C-Erweiterung ist G7s Bring-Schuld.
 - `list_views.V_LIST_G15_VAT_SKONTO` — finaler Steuerbetrag je Rechnung aus G8; überschreibt in `sp_G15_create_vat_statement` den Rechnungsbetrag bei Skonto (ADR-010, aktuell Stub).
-- `list_views.V_LIST_G15_INPUT_VAT` — G4 (Wareneingänge, Stub).
-- `list_views.V_LIST_G15_VAT_STATEMENT` und `list_views.V_LIST_G15_VAT_STATEMENT_ITEM` kapseln die eigenen Tabellen für die Streamlit-App.
+- `list_views.V_LIST_G15_INPUT_VAT` — G4 (Lieferantenrechnungen); aktiv auf `V_LIST_SUPPLIER_INVOICE` (`TOTAL_VAT_AMOUNT`), liefert 0 Zeilen bis G4 Daten einspielt.
+- `list_views.V_LIST_G15_VAT_STATEMENT`, `list_views.V_LIST_G15_VAT_STATEMENT_ITEM` und `list_views.V_LIST_G15_VAT_USER` kapseln die eigenen Tabellen für die Streamlit-App.
 - `dbo.fn_get_user_securitylevel` liest `T_USER.SECURITYLEVEL`; die Status-Procedures prüfen erlaubte Übergänge über `T_CODE_NEXT.SECURITY_LEVEL`.
 
 Stubs liefern Spalten mit korrekter Signatur, aber 0 Zeilen (`WHERE 1 = 0`). Aktivierung = auskommentierten Block in der View durch echten SELECT austauschen, siehe Kommentare in den View-Dateien.
@@ -42,10 +42,10 @@ Kurz-Cheatsheet:
 | Tabelle | `dbo.T_<NAME>` UPPER | `dbo.T_VAT_STATEMENT` |
 | Tabellen-Spalte | UPPER_SNAKE | `VAT_STATUS`, `SOURCE_INVOICE_DATE` |
 | LOV-View | `list_views.LOV_<NAME>` | `list_views.LOV_VAT_STATUS` |
-| List-View | `list_views.V_LIST_<NAME>` | `list_views.V_LIST_OUTPUT_VAT` |
+| List-View | `list_views.V_LIST_<NAME>` | `list_views.V_LIST_G15_OUTPUT_VAT` |
 | Insert-View | `ins_views.V_INS_<NAME>` | (bei Bedarf) |
 | Update-View | `upd_views.V_UPD_<NAME>` | (bei Bedarf) |
-| Stored Function | `stored_func.fn_<purpose>_<entity>` klein | `stored_func.fn_calculate_vat_balance` |
-| Stored Procedure | `stored_proc.sp_<action>_<entity>` klein | `stored_proc.sp_create_vat_statement` |
+| Stored Function | `stored_func.fn_<purpose>_<entity>` klein | `stored_func.fn_G15_calculate_vat_balance` |
+| Stored Procedure | `stored_proc.sp_<action>_<entity>` klein | `stored_proc.sp_G15_create_vat_statement` |
 | Parameter | `@<name>` klein, snake_case | `@vat_period`, `@created_by` |
 | Constraints | `CHK_`/`FK_`/`PK_/UQ_` + Tabelle + Spalte UPPER | `CHK_VAT_STATEMENT_STATUS` |

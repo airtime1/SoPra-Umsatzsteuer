@@ -36,6 +36,16 @@ Sprache einheitlich, nicht gemischt (in unserem Projekt: Englisch).
 | View zum Einfügen | `V_INS_` | `ins_views` |
 | View zum Ändern | `V_UPD_` | `upd_views` |
 
+## Gruppenpräfix `G15`
+
+Coaching-Feedback Prof. Lehmann: Objekte tragen zusätzlich das **Gruppenpräfix `G15`** direkt nach dem Typ-Präfix, damit in der gemeinsamen Dev-DB erkennbar bleibt, welche Gruppe ein Objekt besitzt (teamweit üblich, vgl. `fn_G04_*`, `sp_G08_*`, `V_LIST_G07_*`).
+
+- Views: `V_LIST_G15_<ENTITY>` (z. B. `V_LIST_G15_OUTPUT_VAT`)
+- Functions: `fn_G15_<PURPOSE>_<ENTITY>` (z. B. `fn_G15_check_vat_period`)
+- Procedures: `sp_G15_<ACTION>_<ENTITY>` (z. B. `sp_G15_create_vat_statement`)
+
+Ausnahme im Ist-Stand: `LOV_VAT_STATUS` ist in ERPDEV26S **ohne** `G15` deployed (einzige Ausnahme; ob Absicht, ist mit dem Prof noch zu klären). Die Security-Level-Prüfung nutzt die **zentrale** Architektur-Funktion `dbo.fn_get_user_securitylevel` — Gruppe 15 legt dafür keine eigene Funktion an.
+
 ## Formate
 
 **Stored Procedure:** `<SCHEMA>.sp_<ACTION>_<ENTITY>[_<DETAIL>]`
@@ -61,20 +71,20 @@ Beispiele aus der Dev-DB:
 
 | MS4 sagte | HdM-konform |
 |---|---|
-| `SF_CK_VAT_PERIOD` | `stored_func.fn_check_vat_period` |
-| `SF_CAL_VAT` | `stored_func.fn_calculate_vat_balance` |
-| `SP_CREATE_VAT_STATEMENT` | `stored_proc.sp_create_vat_statement` |
+| `SF_CK_VAT_PERIOD` | `stored_func.fn_G15_check_vat_period` |
+| `SF_CAL_VAT` | `stored_func.fn_G15_calculate_vat_balance` |
+| `SP_CREATE_VAT_STATEMENT` | `stored_proc.sp_G15_create_vat_statement` |
 | `LOV_VAT_STATUS` (lov_views) | `list_views.LOV_VAT_STATUS` |
-| `OUTPUT_VAT_TOTAL` | `list_views.V_LIST_OUTPUT_VAT` |
-| `INPUT_VAT_TOTAL` | `list_views.V_LIST_INPUT_VAT` |
+| `OUTPUT_VAT_TOTAL` | `list_views.V_LIST_G15_OUTPUT_VAT` |
+| `INPUT_VAT_TOTAL` | `list_views.V_LIST_G15_INPUT_VAT` |
 | `T_VAT_STATEMENT` | `dbo.T_VAT_STATEMENT` (unverändert) |
 | `T_VAT_STATEMENT_ITEM` | `dbo.T_VAT_STATEMENT_ITEM` (unverändert) |
 | Spalte `VAT_STATUS` | bleibt `VAT_STATUS` (Tabellenspalte = UPPER_CASE) |
 
 Status-Workflow-Procs (ergänzt):
-- `stored_proc.sp_approve_vat_statement` — DRAFT → APPROVED
-- `stored_proc.sp_pay_vat_statement` — APPROVED → PAID
-- `stored_proc.sp_reject_vat_statement` — APPROVED → DRAFT
+- `stored_proc.sp_G15_approve_vat_statement` — DRAFT → APPROVED
+- `stored_proc.sp_G15_pay_vat_statement` — APPROVED → PAID
+- `stored_proc.sp_G15_reject_vat_statement` — APPROVED → DRAFT
 
 ## Wichtig zur Beobachtung in der Dev-DB
 

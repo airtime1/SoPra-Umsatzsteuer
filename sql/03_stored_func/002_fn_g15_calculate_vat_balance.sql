@@ -1,5 +1,5 @@
 -- ============================================================
--- stored_func.fn_calculate_vat_balance
+-- stored_func.fn_G15_calculate_vat_balance
 -- Berechnet aus Umsatzsteuer- und Vorsteuersumme den Saldo
 -- (Absolutbetrag) und den Typ (ZAHLLAST/UEBERHANG/NEUTRAL).
 --
@@ -12,7 +12,7 @@
 -- zurueckgegeben werden koennen.
 -- ============================================================
 
-CREATE OR ALTER FUNCTION stored_func.fn_calculate_vat_balance
+CREATE OR ALTER FUNCTION stored_func.fn_G15_calculate_vat_balance
 (
     @output_vat_total DECIMAL(12,2),
     @input_vat_total  DECIMAL(12,2)

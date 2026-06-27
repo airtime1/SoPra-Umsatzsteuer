@@ -1,5 +1,5 @@
 -- ============================================================
--- Test: stored_proc.sp_create_vat_statement — Demo-Periode 2026-04
+-- Test: stored_proc.sp_G15_create_vat_statement — Demo-Periode 2026-04
 -- Voraussetzung: sql/99_seed/001_demo_vat_workflow.sql wurde eingespielt.
 -- Erwartung: RESULT in allen Zeilen = PASS
 -- ============================================================
@@ -13,7 +13,7 @@ BEGIN TRY
 
     DECLARE @statement TABLE (VAT_STATEMENT_ID INT);
     INSERT INTO @statement
-    EXEC stored_proc.sp_create_vat_statement
+    EXEC stored_proc.sp_G15_create_vat_statement
         @vat_period = '2026-04',
         @created_by = @clerk;
 
@@ -30,12 +30,12 @@ BEGIN TRY
     DECLARE @period_end DATE = EOMONTH(@period_start);
     DECLARE @expected_output DECIMAL(12,2) = (
         SELECT ISNULL(SUM(TAX_AMOUNT), 0)
-        FROM list_views.V_LIST_OUTPUT_VAT
+        FROM list_views.V_LIST_G15_OUTPUT_VAT
         WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end
     );
     DECLARE @expected_input DECIMAL(12,2) = (
         SELECT ISNULL(SUM(TAX_AMOUNT), 0)
-        FROM list_views.V_LIST_INPUT_VAT
+        FROM list_views.V_LIST_G15_INPUT_VAT
         WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end
     );
     DECLARE @expected_balance DECIMAL(12,2);
@@ -44,17 +44,17 @@ BEGIN TRY
         SELECT COUNT(*)
         FROM (
             SELECT SOURCE_TABLE, SOURCE_INVOICE_ID
-            FROM list_views.V_LIST_OUTPUT_VAT
+            FROM list_views.V_LIST_G15_OUTPUT_VAT
             WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end
             UNION ALL
             SELECT SOURCE_TABLE, SOURCE_INVOICE_ID
-            FROM list_views.V_LIST_INPUT_VAT
+            FROM list_views.V_LIST_G15_INPUT_VAT
             WHERE SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end
         ) src
     );
 
     SELECT @expected_balance = VAT_BALANCE, @expected_type = VAT_TYPE
-    FROM stored_func.fn_calculate_vat_balance(@expected_output, @expected_input);
+    FROM stored_func.fn_G15_calculate_vat_balance(@expected_output, @expected_input);
 
     SELECT
         'TC-SP-DEMO-01' AS CASE_ID,

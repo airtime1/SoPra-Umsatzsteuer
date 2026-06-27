@@ -22,12 +22,12 @@ Korrekturbetrag mehr zu berechnen — der Endwert kommt fertig.
 
 Die Skonto-Korrektur wird **nicht** als eigene Belegzeile gebucht, sondern
 **überschreibt** den ursprünglichen `TAX_AMOUNT` der bereits erfassten
-Rechnung. Verfahren in `stored_proc.sp_create_vat_statement`:
+Rechnung. Verfahren in `stored_proc.sp_G15_create_vat_statement`:
 
-1. **Erfassen:** Alle USt (`V_LIST_OUTPUT_VAT`) und VSt
-   (`V_LIST_INPUT_VAT`) der Periode mit dem ursprünglichen Steuerbetrag
+1. **Erfassen:** Alle USt (`V_LIST_G15_OUTPUT_VAT`) und VSt
+   (`V_LIST_G15_INPUT_VAT`) der Periode mit dem ursprünglichen Steuerbetrag
    als Items anlegen.
-2. **Überschreiben:** Über `list_views.V_LIST_VAT_SKONTO` (liest G8) die
+2. **Überschreiben:** Über `list_views.V_LIST_G15_VAT_SKONTO` (liest G8) die
    Rechnungen mit `IS_SKONTO = 'Y'` ermitteln und auf der passenden
    Item-Zeile (Match über `INVOICE_ID`) den finalen Steuerbetrag setzen,
    `IS_CORRECTION = 1` und `ORIGINAL_INVOICE_ID = SOURCE_INVOICE_ID`.
@@ -39,7 +39,7 @@ konsumiert den fertigen Endbetrag.
 
 Wir gewähren maximal **7 Tage Skonto**. Genau deshalb darf eine Periode
 erst **ab dem 10. des Folgemonats** abgerechnet werden
-(`fn_check_vat_period`). Eine Rechnung der Periode kann spätestens 7 Tage
+(`fn_G15_check_vat_period`). Eine Rechnung der Periode kann spätestens 7 Tage
 nach dem Monatsende mit Skonto bezahlt werden — also vor dem
 Abrechnungsstichtag. Beim Bau der Abrechnung sind daher alle relevanten
 Skonto-Zahlungen bereits eingegangen. Das Matching über `INVOICE_ID`
@@ -51,9 +51,9 @@ ein gesonderter Datumsfilter auf die Zahlungseingänge ist nicht nötig.
 - `IS_CORRECTION` und `ORIGINAL_INVOICE_ID` in `T_VAT_STATEMENT_ITEM`
   bleiben erhalten (Audit-Spur: „hier hat Skonto gewirkt"), ohne Schema-
   Änderung an der Architekten-Tabelle.
-- `V_LIST_OUTPUT_VAT` führt **keinen** G8-Korrektur-Block mehr; G8 fließt
+- `V_LIST_G15_OUTPUT_VAT` führt **keinen** G8-Korrektur-Block mehr; G8 fließt
   nur noch über den Überschreib-Schritt ein.
-- Neue View `list_views.V_LIST_VAT_SKONTO` (vorerst Stub `WHERE 1 = 0`,
+- Neue View `list_views.V_LIST_G15_VAT_SKONTO` (vorerst Stub `WHERE 1 = 0`,
   bis G8 die Felder `INVOICE_ID` / finaler `TAX_AMOUNT` / `IS_SKONTO`
   liefert — Issue #26).
 - Schnittstellen-Anforderung an G8 ist neu: finaler Steuerbetrag statt

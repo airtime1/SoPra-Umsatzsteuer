@@ -49,9 +49,9 @@ Format:
 
 Beispiele:
 ```
-feat(stored-proc): sp_pay_vat_statement APPROVED→PAID
+feat(stored-proc): sp_G15_pay_vat_statement APPROVED→PAID
 
-Spiegelt sp_approve_vat_statement, setzt CLOSED_BY/AT,
+Spiegelt sp_G15_approve_vat_statement, setzt CLOSED_BY/AT,
 prueft Status-Vorbedingung.
 ```
 ```
@@ -60,7 +60,7 @@ docs(adr): ADR-008 — Periodenwechsel ab dem 10.
 Klarstellung mit Prof. Lehmann beim Coaching am 03.06.
 ```
 ```
-fix(view): V_LIST_OUTPUT_VAT — Tippfehler im JOIN
+fix(view): V_LIST_G15_OUTPUT_VAT — Tippfehler im JOIN
 ```
 
 Typ-Liste passt zu Branch-Typen oben (`feat`, `fix`, `refactor`, `docs`, `test`, `chore`).
@@ -101,7 +101,7 @@ Nicht mergen, wenn:
 ## Code-Review — wie man andere reviewt
 
 - **Sei freundlich, sei konkret.** „Hier wäre `SOURCE_INVOICE_ID` konsistenter als `INVOICE_ID`, weil…" statt „falsch".
-- **Frage, statt zu fordern.** „Warum nicht über `V_LIST_OUTPUT_VAT`? Verstehe ich die Anforderung falsch?"
+- **Frage, statt zu fordern.** „Warum nicht über `V_LIST_G15_OUTPUT_VAT`? Verstehe ich die Anforderung falsch?"
 - **Approve auch ohne Perfektion**, wenn es vorwärtskommt. Perfekt ist der Feind von gut.
 - **Mark als „Request changes" nur bei echten Blockern** (Bug, Sicherheit, Konventionsverletzung).
 

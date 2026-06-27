@@ -1,10 +1,10 @@
 -- ============================================================
--- list_views.V_LIST_VAT_STATEMENT
+-- list_views.V_LIST_G15_VAT_STATEMENT
 -- Anzeige-View fuer Umsatzsteuerabrechnungs-Kopfdatensaetze.
 -- Frontend liest ueber diese View statt direkt aus dbo.
 -- ============================================================
 
-CREATE OR ALTER VIEW list_views.V_LIST_VAT_STATEMENT
+CREATE OR ALTER VIEW list_views.V_LIST_G15_VAT_STATEMENT
 AS
 SELECT
     VAT_STATEMENT_ID,

@@ -81,15 +81,16 @@ Wichtige eigene Objekte:
 |---|---|
 | `dbo.T_VAT_STATEMENT` | Kopf einer monatlichen Umsatzsteuerabrechnung |
 | `dbo.T_VAT_STATEMENT_ITEM` | Detailzeilen mit einzelnen Steuerfaellen |
-| `list_views.LOV_VAT_STATUS` | Werteliste fuer `DRAFT`, `APPROVED`, `PAID` |
-| `list_views.V_LIST_G15_OUTPUT_VAT` | Umsatzsteuer aus allen Ausgangsrechnungen; konsumiert `TAX_AMOUNT` direkt, keine Eigenberechnung (ADR-008) |
+| `list_views.LOV_VAT_STATUS` | Werteliste fuer `DRAFT`, `APPROVED`, `PAID`; in ERPDEV26S bewusst **ohne** `G15`-Praefix deployed (einzige Ausnahme, Klaerung offen) |
+| `list_views.V_LIST_G15_OUTPUT_VAT` | Umsatzsteuer aus allen Ausgangsrechnungen; eine Quelle `V_LIST_G07_INVOICE` (G7-View ueber `T_INVOICE`, inkl. G9/G10-Barverkaeufe), konsumiert `TAX_AMOUNT` direkt, keine Eigenberechnung (ADR-008) |
 | `list_views.V_LIST_G15_VAT_SKONTO` | finaler Steuerbetrag je Rechnung aus G8 (Skonto); Quelle fuer den Ueberschreib-Schritt in `sp_G15_create_vat_statement` (ADR-010), aktuell Stub |
-| `list_views.V_LIST_G15_INPUT_VAT` | Vorsteuer aus G4 (Wareneingaenge); konsumiert `TAX_AMOUNT` direkt aus der Partner-Lese-View, keine Eigenberechnung (ADR-008) |
+| `list_views.V_LIST_G15_INPUT_VAT` | Vorsteuer aus G4 (Lieferantenrechnungen); aktiv auf `V_LIST_SUPPLIER_INVOICE`, konsumiert `TOTAL_VAT_AMOUNT` als `TAX_AMOUNT`, keine Eigenberechnung (ADR-008); 0 Zeilen bis G4 Daten einspielt |
 | `list_views.V_LIST_G15_VAT_STATEMENT` | Anzeige-View fuer Abrechnungskopf |
 | `list_views.V_LIST_G15_VAT_STATEMENT_ITEM` | Anzeige-View fuer Abrechnungspositionen |
-| `dbo.T_USER` / `dbo.fn_get_user_securitylevel` | APP-lesbare Demo-User und zentrale Security-Level-Function; in ERPDEV26S gibt es aktuell keine G15-User-View |
+| `list_views.V_LIST_G15_VAT_USER` | Minimale User-/Rollen-View ohne Passwortdaten; **nicht** in ERPDEV26S deployed (nur lokal/Sandbox, Klaerung offen) |
 | `stored_func.fn_G15_check_vat_period` | Prueft Periodenformat, 10.-des-Folgemonats-Regel und Sperrstatus |
 | `stored_func.fn_G15_calculate_vat_balance` | Berechnet `VAT_BALANCE` als Absolutbetrag und `VAT_TYPE` |
+| `dbo.fn_get_user_securitylevel` | Zentrale Architekten-Funktion (liest `dbo.T_USER.SECURITYLEVEL`) fuer Rollenpruefungen; G15 bindet sie ein, eigene Funktion entfernt (Coaching-Feedback) |
 | `stored_proc.sp_G15_create_vat_statement` | Legt Abrechnung an oder berechnet bestehenden `DRAFT` neu |
 | `stored_proc.sp_G15_approve_vat_statement` | Statuswechsel `DRAFT` -> `APPROVED` |
 | `stored_proc.sp_G15_pay_vat_statement` | Statuswechsel `APPROVED` -> `PAID` |
@@ -102,9 +103,9 @@ Verbindliche DB-Regeln:
 - Keine eigene Steuerberechnung: Steuerbetraege kommen fertig aus den Partner-Views, fehlende Felder/Views sind Bring-Schuld der Partner (ADR-008). Noch nicht gelieferte Quellen laufen als Stub (`WHERE 1 = 0`).
 - Statusuebergaenge pruefen die Status-Procedures ueber die zentrale Architekten-Function `dbo.fn_chk_status_folge` (liest `dbo.T_CODE_NEXT`, ADR-009); die Rolle bleibt eigene Pruefung.
 - Geschaeftslogik liegt moeglichst in Stored Functions/Procedures, nicht im Frontend.
-- HdM-Namenskonventionen strikt einhalten: Tabellen und Tabellenspalten UPPER_CASE, Procedures/Functions klein mit `sp_`/`fn_`, Views mit `LOV_`, `V_LIST_`, `V_INS_`, `V_UPD_`.
+- HdM-Namenskonventionen strikt einhalten: Tabellen und Tabellenspalten UPPER_CASE, Procedures/Functions klein mit `sp_`/`fn_`, Views mit `LOV_`, `V_LIST_`, `V_INS_`, `V_UPD_`. Zusaetzlich Gruppenpraefix `G15` direkt nach dem Typ-Praefix (`V_LIST_G15_*`, `fn_G15_*`, `sp_G15_*`), wie teamweit ueblich (Coaching-Feedback); einzige Ausnahme in der Dev-DB ist `LOV_VAT_STATUS` (ohne `G15`).
 - `VAT_BALANCE` ist immer ein nicht-negativer Absolutbetrag; `VAT_TYPE` unterscheidet `ZAHLLAST`, `UEBERHANG`, `NEUTRAL`.
-- Abgeschlossene oder freigegebene Abrechnungen duerfen nicht neu berechnet werden; nur `DRAFT` darf durch `stored_proc.sp_G15_create_vat_statement` ersetzt werden.
+- Abgeschlossene oder freigegebene Abrechnungen duerfen nicht neu berechnet werden; nur `DRAFT` darf durch `sp_G15_create_vat_statement` ersetzt werden.
 - Eine Periode darf nur einmal existieren (`VAT_PERIOD` eindeutig). Bestehende Sandbox-/DEV-Instanzen werden ueber idempotente Constraint-Skripte nachgezogen.
 - Status-Procedures pruefen Rollen ueber `T_CODE_NEXT.SECURITY_LEVEL` und `T_USER.SECURITYLEVEL`: Sachbearbeiter `1`, Leitung FiBu `2`, CFO `3`.
 
@@ -112,17 +113,16 @@ Verbindliche DB-Regeln:
 
 Streamlit findet die Seiten automatisch unter `app/pages/`.
 
-1. `app/main.py` rendert die mockup-nahe Hauptseite/Übersicht.
-2. `app/pages/1_Übersicht.py` rendert dieselbe Übersicht fuer Streamlit-Multipage-Navigation.
-3. `app/pages/2_Neue_Abrechnung.py` leitet Perioden aus Quellbelegen, bestehenden Abrechnungen und `stored_func.fn_G15_check_vat_period` ab und legt ueber `stored_proc.sp_G15_create_vat_statement` an.
-4. `app/pages/3_Abrechnung_auswählen.py` zeigt Auswahl, Kopf, Positionen, Verlauf und ruft die `stored_proc.sp_G15_*`-Status-Procedures rollenabhaengig auf.
-5. `app/ui.py` enthaelt nur gemeinsame Darstellung, Formatierung, Dialoge und Navigation.
-6. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe, liest aus den G15-Anzeige-Views und nutzt fuer die UI direkt `get_app_conn()`.
-7. `app/db.py` liest `.env` und stellt App-, Dev- und Sandbox-Verbindungen bereit; die finale App nutzt davon den APP-Zugang.
+1. `app/main.py` initialisiert die App und erklaert die Navigation.
+2. `app/pages/1_Übersicht.py` zeigt bestehende Abrechnungen mit Statusfilter und Kennzahlen.
+3. `app/pages/2_Neue_Abrechnung.py` legt eine Periode ueber `stored_proc.sp_G15_create_vat_statement` an oder berechnet einen `DRAFT` neu. Der Default ist die letzte nach 10.-des-Folgemonats-Regel abrechenbare Periode.
+4. `app/pages/3_Detail.py` zeigt Kopf und Items, Audit-Spuren und ruft die Status-Procedures mit passenden Demo-Rollen auf.
+5. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe, liest aus Anzeige-Views und nutzt `get_active_conn()`.
+6. `app/db.py` liest `.env`, stellt App-, Dev- und Sandbox-Verbindungen bereit und waehlt die aktive App-Verbindung ueber `APP_DB_PROFILE`.
 
 Die Sandbox ist fuer die finale UI nicht mehr Laufzeitbasis. Lokale UI-Pruefung erfolgt gegen den vorgesehenen APP-Zugang auf `ERPDEV26S`.
 
-Die UI enthaelt weiterhin keine echte Authentifizierung. Sie ordnet die Dropdowns `Fachkraft 1/2/3` den APP-lesbaren Demo-Usern `fachb1/2/3` aus `dbo.T_USER` zu; die verbindliche Rollenpruefung liegt in den Stored Procedures.
+Die UI enthaelt weiterhin keine echte Authentifizierung. Sie bietet aber Demo-User je Rolle aus `list_views.V_LIST_G15_VAT_USER` an; die verbindliche Rollenpruefung liegt in den Stored Procedures.
 
 ## Deployment und Sandbox
 
@@ -135,8 +135,8 @@ Die UI enthaelt weiterhin keine echte Authentifizierung. Sie ordnet die Dropdown
 
 - `tests/test_cases.md` ist der Testfall-Katalog.
 - `tests/abnahmekriterien.md` beschreibt SPC-1 bis SPC-9.
-- `tests/sql/fn_calculate_vat_balance_basic.sql` prueft die Saldo-/Typberechnung.
-- `tests/sql/sp_create_vat_statement_demo.sql` prueft die Anlage der Demo-Abrechnung gegen Seed-Daten.
+- `tests/sql/fn_g15_calculate_vat_balance_basic.sql` prueft die Saldo-/Typberechnung.
+- `tests/sql/sp_g15_create_vat_statement_demo.sql` prueft die Anlage der Demo-Abrechnung gegen Seed-Daten.
 - `tests/sql/sp_status_workflow_roles_demo.sql` prueft Statusfolge, Rollen und Sperre bezahlter Perioden.
 - `tests/sql/README.md` beschreibt die Konvention fuer weitere SQL-Tests.
 - Ein `tests/python/`-pytest-Wrapper ist dokumentiert, aber noch nicht umgesetzt.
@@ -162,13 +162,13 @@ Die ADRs in `docs/entscheidungen/` dokumentieren den aktuellen Entscheidungsstan
 Aus der Git-Historie dauerhaft relevant:
 - PR #17 bereinigte alte Grossschreibungs-Referenzen auf Function-/Procedure-Namen. Neue Doku darf nicht mehr `SF_*`/`SP_*` als aktuelle Objektnamen verwenden, ausser beim historischen MS4-Mapping.
 - PR #18 fuegte `ONBOARDING.md` als Setup-Leitfaden fuer neue Team-Mitglieder hinzu.
-- PR #19 fuegte `APP_DB_PROFILE` fuer umschaltbare App-Verbindungen (`app`, `dev`, `sandbox`) hinzu, stabilisierte Streamlit-Page-Imports und stellte die App-Services auf `get_active_conn()` um. (Die damalige Item-Aggregation in `V_LIST_OUTPUT_VAT` wurde mit ADR-008 durch direkten Konsum der Partner-Lese-Views ersetzt.)
+- PR #19 fuegte `APP_DB_PROFILE` fuer umschaltbare App-Verbindungen (`app`, `dev`, `sandbox`) hinzu, stabilisierte Streamlit-Page-Imports und stellte die App-Services auf `get_active_conn()` um. (Die damalige Item-Aggregation in `V_LIST_G15_OUTPUT_VAT` wurde mit ADR-008 durch direkten Konsum der Partner-Lese-Views ersetzt.)
 - Der Team-Repo-Workflow mit GitHub-Issues, PR-Template und Issue-Templates wurde in `CONTRIBUTING.md` etabliert.
 - Die HdM-Namenskonventionen und Dev-DB-Befunde wurden in ADR-007, `docs/namenskonventionen/INDEX.md`, SQL-Kommentaren und `docs/offene_fragen.md` eingearbeitet. Die lokale Dev-DB-Kopie selbst wird nicht committed.
 
 ## Bekannte Einschraenkungen und offene Punkte
 
-- Partner-Lieferstand 2026-06-16 gegen ERPDEV26S: G7 (`V_LIST_G07_INVOICE`) aktiv, aber deutsche Spaltennamen (Mapping in unserer View) und **nur Fernabsatz** — die View filtert ueber INNER JOINs auf die Angebot->Auftrag->Lieferung-Kette, B2C-Barverkaeufe (G9/G10) fehlen noch (78 von 156 G9-Rechnungen sichtbar). G7 muss die View auf alle `T_INVOICE`-Rechnungen erweitern. G4 weiterhin ohne View (`V_LIST_INPUT_VAT` Stub). G8 (`V_LIST_G08_PAYMENT_RECEIPT`) ohne finalen `TAX_AMOUNT`/`IS_SKONTO` (`V_LIST_VAT_SKONTO` Stub). Bring-Schulden als Issues #24-#28 dokumentiert.
+- Partner-/Deploy-Stand 2026-06-27 gegen ERPDEV26S: Alle G15-Objekte sind deployt und konsistent benannt (`V_LIST_G15_*`, `fn_G15_*`, `sp_G15_*`; Security ueber `dbo.fn_get_user_securitylevel`); der zwischenzeitliche unvollstaendige Coaching-Rename (kaputte Referenzen) ist per Redeploy behoben. Die dbo-Tabellen `T_VAT_STATEMENT`/`_ITEM` existieren jetzt (vom Architekten angelegt). G7 (`V_LIST_G07_INVOICE`) aktiv, aber deutsche Spaltennamen (Mapping in unserer View) und **nur Fernabsatz** (INNER JOINs Angebot->Auftrag->Lieferung); B2C-Barverkaeufe (G9/G10) fehlen noch. G4 (`V_LIST_SUPPLIER_INVOICE`, `TOTAL_VAT_AMOUNT`) ist angebunden (`V_LIST_G15_INPUT_VAT` aktiv), hat aber noch 0 Datenzeilen. Skonto: G8 hat zwar das Skonto-Flag `SKONTO_BERECHTIGT_YN` (in `V_LIST_G08_PAYMENT_RECEIPT`), aber weiterhin **keinen finalen Steuerbetrag nach Skonto** — und genau den braucht der Ueberschreib-Schritt (ADR-010). Die separate `V_LIST_G08_VAT_CORRECTION` enthaelt nur Ueberzahlungs-Korrekturen als Delta (`Korrekturart='Ueberzahlung'`) und ist dafuer nicht geeignet. Daher bleibt `V_LIST_G15_VAT_SKONTO` Stub; der vorbereitete SELECT (echte Spalten `INVOICE_ID`/`SKONTO_BERECHTIGT_YN`/`STORNO_YN`, Platzhalter fuer den Endbetrag) wird eingesetzt, sobald G8 liefert. Liefert G8 nicht rechtzeitig, laufen Skonto-Betraege bewusst nicht ein (keine Eigenberechnung, ADR-008) — das ist G8s Bring-Schuld (Issue #26). Bring-Schulden als Issues #24-#28 dokumentiert.
 - Status-Workflow haengt zur Laufzeit an `dbo.fn_chk_status_folge` (in ERPDEV vorhanden, in der lokalen Sandbox nicht). Vollstaendiger Workflow-Test nur gegen ERPDEV26S.
 - APP-Schreibtest 2026-06-27: Die live vorhandenen G15-Procedures in ERPDEV26S wurden auf `dbo.fn_get_user_securitylevel` sowie die vorhandenen `list_views.V_LIST_G15_*`-/`stored_func.fn_G15_*`-Objekte korrigiert. Anlage, Freigabe, Rueckweisung und Bezahlung liefen ueber den APP-Zugang in einer Rollback-Transaktion erfolgreich.
 - APP-Rechte nach DEV-DB-Kopie 2026-06-27: `ERP_REMOTE_USER` benoetigt `EXECUTE` auf `stored_func.fn_G15_check_vat_period` und die vier `stored_proc.sp_G15_*`-Procedures sowie `SELECT` auf `stored_func.fn_G15_calculate_vat_balance` (table-valued Function). Diese Grants wurden nachgezogen.

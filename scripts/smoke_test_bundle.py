@@ -113,17 +113,16 @@ def step_inventory() -> None:
     expected = {
         "dbo": {"T_VAT_STATEMENT", "T_VAT_STATEMENT_ITEM"},
         "list_views": {
-            "LOV_VAT_STATUS", "V_LIST_OUTPUT_VAT", "V_LIST_VAT_SKONTO",
-            "V_LIST_INPUT_VAT", "V_LIST_VAT_STATEMENT",
-            "V_LIST_VAT_STATEMENT_ITEM", "V_LIST_VAT_USER",
+            "LOV_VAT_STATUS", "V_LIST_G15_OUTPUT_VAT", "V_LIST_G15_VAT_SKONTO",
+            "V_LIST_G15_INPUT_VAT", "V_LIST_G15_VAT_STATEMENT",
+            "V_LIST_G15_VAT_STATEMENT_ITEM", "V_LIST_G15_VAT_USER",
         },
         "stored_func": {
-            "fn_check_vat_period", "fn_calculate_vat_balance",
-            "fn_get_user_security_level",
+            "fn_G15_check_vat_period", "fn_G15_calculate_vat_balance",
         },
         "stored_proc": {
-            "sp_create_vat_statement", "sp_approve_vat_statement",
-            "sp_pay_vat_statement", "sp_reject_vat_statement",
+            "sp_G15_create_vat_statement", "sp_G15_approve_vat_statement",
+            "sp_G15_pay_vat_statement", "sp_G15_reject_vat_statement",
         },
     }
 
