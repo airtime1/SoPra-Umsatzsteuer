@@ -93,7 +93,7 @@ def get_statement_items(statement_id: int) -> pd.DataFrame:
                IS_CORRECTION, ORIGINAL_INVOICE_ID,
                CREATED_BY, CREATED_AT
         FROM list_views.V_LIST_G15_VAT_STATEMENT_ITEM
-        WHERE VAT_STATEMENT_ID = ?
+        WHERE VAT_STATEMENT_ID = %s
         ORDER BY SOURCE_INVOICE_DATE, SOURCE_TABLE, SOURCE_INVOICE_ID
     """
     return _read_sql(sql, [statement_id])
@@ -137,12 +137,17 @@ def list_users() -> pd.DataFrame:
     """
 
     sql = """
-        SELECT USERNAME, SECURITYLEVEL, VAT_ROLE
-        FROM list_views.V_LIST_G15_VAT_USER
+        SELECT USERNAME, SECURITYLEVEL
+        FROM dbo.T_USER
         WHERE SECURITYLEVEL IN (1, 2, 3)
         ORDER BY SECURITYLEVEL, USERNAME
     """
-    users = _read_sql(sql)
+    try:
+        users = _read_sql(sql)
+    except Exception:
+        # Falls die APP-Connection dbo.T_USER nicht lesen darf: leer zurueck,
+        # die UI faellt auf Default-Fachkraefte (fachb1/2/3) zurueck.
+        users = pd.DataFrame(columns=["USERNAME", "SECURITYLEVEL"])
     if users.empty:
         return pd.DataFrame(columns=["USERNAME", "SECURITYLEVEL", "VAT_ROLE"])
 
@@ -186,18 +191,20 @@ def check_period(period: str, check_date: date | None = None) -> int:
     """Rueckgabe der DB-Function: 0 = zulaessig, 1 = gesperrt/ungueltig."""
 
     check_date = check_date or date.today()
-    sql = f"SELECT {CHECK_PERIOD_FUNCTION}(?, ?) AS CHECK_RESULT"
+    sql = f"SELECT {CHECK_PERIOD_FUNCTION}(%s, %s) AS CHECK_RESULT"
     with get_app_conn() as conn:
         cur = conn.cursor()
-        return int(cur.execute(sql, period, check_date).fetchval())
+        cur.execute(sql, (period, check_date))
+        return int(cur.fetchone()[0])
 
 
 def calculate_balance(output_vat_total: Decimal | float, input_vat_total: Decimal | float) -> dict[str, Any]:
-    sql = f"SELECT VAT_BALANCE, VAT_TYPE FROM {BALANCE_FUNCTION}(?, ?)"
+    sql = f"SELECT VAT_BALANCE, VAT_TYPE FROM {BALANCE_FUNCTION}(%s, %s)"
     with get_app_conn() as conn:
         cur = conn.cursor()
-        row = cur.execute(sql, output_vat_total, input_vat_total).fetchone()
-        return {"VAT_BALANCE": row.VAT_BALANCE, "VAT_TYPE": row.VAT_TYPE}
+        cur.execute(sql, (output_vat_total, input_vat_total))
+        row = cur.fetchone()
+        return {"VAT_BALANCE": row[0], "VAT_TYPE": row[1]}
 
 
 def list_period_options(months_back: int = 18) -> pd.DataFrame:
@@ -214,7 +221,7 @@ def list_period_options(months_back: int = 18) -> pd.DataFrame:
             UNION ALL
             SELECT offset_month + 1
             FROM generated
-            WHERE offset_month + 1 < ?
+            WHERE offset_month + 1 < %s
         ),
         candidate_periods AS (
             SELECT CONVERT(char(7), DATEADD(month, -offset_month, CAST(GETDATE() AS date)), 120) AS VAT_PERIOD
@@ -292,7 +299,7 @@ def get_statement_history(statement_id: int) -> pd.DataFrame:
             SELECT VAT_STATEMENT_ID, EVENT_TYPE, OLD_STATUS, NEW_STATUS,
                    EVENT_BY, EVENT_AT
             FROM list_views.V_LIST_G15_VAT_STATEMENT_HISTORY
-            WHERE VAT_STATEMENT_ID = ?
+            WHERE VAT_STATEMENT_ID = %s
             ORDER BY EVENT_AT, VAT_STATEMENT_HISTORY_ID
         END
         ELSE IF OBJECT_ID('dbo.T_G15_VAT_STATEMENT_HISTORY') IS NOT NULL
@@ -300,7 +307,7 @@ def get_statement_history(statement_id: int) -> pd.DataFrame:
             SELECT VAT_STATEMENT_ID, EVENT_TYPE, OLD_STATUS, NEW_STATUS,
                    EVENT_BY, EVENT_AT
             FROM dbo.T_G15_VAT_STATEMENT_HISTORY
-            WHERE VAT_STATEMENT_ID = ?
+            WHERE VAT_STATEMENT_ID = %s
             ORDER BY EVENT_AT, VAT_STATEMENT_HISTORY_ID
         END
         ELSE
@@ -322,13 +329,12 @@ def create_statement(period: str, created_by: str) -> int:
     with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.sp_G15_create_vat_statement @vat_period = ?, @created_by = ?",
-            period,
-            created_by,
+            "EXEC stored_proc.sp_G15_create_vat_statement @vat_period = %s, @created_by = %s",
+            (period, created_by),
         )
         row = cur.fetchone()
         conn.commit()
-        return int(row.VAT_STATEMENT_ID)
+        return int(row[0])
 
 
 def approve_statement(statement_id: int, approved_by: str) -> None:
@@ -336,9 +342,8 @@ def approve_statement(statement_id: int, approved_by: str) -> None:
     with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.sp_G15_approve_vat_statement @statement_id = ?, @approved_by = ?",
-            statement_id,
-            approved_by,
+            "EXEC stored_proc.sp_G15_approve_vat_statement @statement_id = %s, @approved_by = %s",
+            (statement_id, approved_by),
         )
         conn.commit()
 
@@ -348,9 +353,8 @@ def reject_statement(statement_id: int, rejected_by: str) -> None:
     with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.sp_G15_reject_vat_statement @statement_id = ?, @rejected_by = ?",
-            statement_id,
-            rejected_by,
+            "EXEC stored_proc.sp_G15_reject_vat_statement @statement_id = %s, @rejected_by = %s",
+            (statement_id, rejected_by),
         )
         conn.commit()
 
@@ -360,8 +364,7 @@ def pay_statement(statement_id: int, paid_by: str) -> None:
     with get_active_conn() as conn:
         cur = conn.cursor()
         cur.execute(
-            "EXEC stored_proc.sp_G15_pay_vat_statement @statement_id = ?, @paid_by = ?",
-            statement_id,
-            paid_by,
+            "EXEC stored_proc.sp_G15_pay_vat_statement @statement_id = %s, @paid_by = %s",
+            (statement_id, paid_by),
         )
         conn.commit()

@@ -2,22 +2,20 @@
 
 Die finale UI laeuft als oeffentliche Streamlit-App. Hosting-Plattform ist
 **Streamlit Community Cloud** (kostenlos, GitHub-gekoppelt). Cloudflare o. ae.
-kommt nicht in Frage: Streamlit braucht einen dauerlaufenden Python-Server +
-ODBC-Treiber, kein statisches/Worker-Hosting.
+kommt nicht in Frage: Streamlit braucht einen dauerlaufenden Python-Server.
 
-## Voraussetzungen im Repo
+## DB-Treiber: pymssql (kein System-ODBC-Treiber)
 
-- `requirements.txt` — Python-Pakete (inkl. `pyodbc`).
-- `packages.txt` — System-Pakete (apt) fuer den SQL-Server-Treiber in der Cloud:
-  nur `freetds-bin` und `tdsodbc`. Damit steht der **FreeTDS**-ODBC-Treiber
-  bereit (Microsofts `msodbcsql` laesst sich auf Streamlit Cloud nicht
-  installieren).
-  - **Wichtig:** unixODBC (`libodbc2`) ist im Cloud-Image bereits vorinstalliert.
-    `unixodbc`/`freetds-dev` NICHT auflisten — `freetds-dev` zieht
-    `unixodbc-dev` aus dem Microsoft-apt-Repo nach, das vom alten `libodbc1`
-    abhaengt und mit dem vorhandenen `libodbc2` kollidiert
-    (`trying to overwrite '/usr/lib/.../libodbc.so.2.0.0'`) -> Build bricht ab.
-    Zur Laufzeit brauchen wir keine Dev-Header (pyodbc ist ein fertiges Wheel).
+Die App-Connection (`app/db.py` -> `get_app_conn`) nutzt **pymssql**. pymssql
+bringt FreeTDS im Python-Wheel mit und braucht **keine System-Pakete**.
+
+- **Kein `packages.txt`** noetig (und es darf keins geben): Der ODBC-Weg
+  (`pyodbc` + `tdsodbc`/`msodbcsql`) ist auf dem Streamlit-Image (Debian trixie)
+  nicht installierbar — `tdsodbc` zieht `libodbc1` aus dem MS-apt-Repo nach, das
+  mit dem vorinstallierten `libodbc2` kollidiert
+  (`trying to overwrite '/usr/lib/.../libodbc.so.2.0.0'`) -> Build-Abbruch.
+- `requirements.txt` enthaelt `pymssql` (App) und weiterhin `pyodbc`
+  (nur fuer lokale Deploy-/Analyse-Skripte via `get_dev_conn`/`get_sandbox_conn`).
 
 ## App anlegen (share.streamlit.io)
 
@@ -31,25 +29,20 @@ ODBC-Treiber, kein statisches/Worker-Hosting.
    APP_DB_PROFILE = "app"
    APP_SERVER     = "edu.hdm-server.eu"
    APP_DATABASE   = "ERPDEV26S"
-   APP_USER       = "<app-user>"
+   APP_USER       = "ERP_REMOTE_USER"
    APP_PASSWORD   = "<app-pass>"
-   ODBC_DRIVER    = "/usr/lib/x86_64-linux-gnu/odbc/libtdsodbc.so"
    ```
 
-   Der absolute Pfad zur FreeTDS-Lib ist robuster als der Treibername
-   `FreeTDS` (keine Abhaengigkeit von der odbcinst-Registrierung).
-
-## FreeTDS-Besonderheit
-
-`app/db.py` ergaenzt den Connection-String nur bei FreeTDS automatisch um
-`PORT` (Default 1433, ueberschreibbar via Secret `DB_PORT`) und
-`TDS_Version=7.4`. Lokal mit dem Microsoft-ODBC-Treiber bleibt alles wie bisher.
+   - **`ODBC_DRIVER` wird NICHT mehr gebraucht** (war nur fuer den pyodbc-Weg).
+   - Optional `DB_PORT` (Default `1433`).
 
 ## Hinweise
 
 - Secrets niemals committen — nur in der Streamlit-Cloud-UI.
-- Der `APP_USER` braucht `SELECT` auf `list_views.*` und `EXECUTE` auf
-  `stored_proc.sp_G15_*`.
+- Der `APP_USER` (`ERP_REMOTE_USER`) braucht `SELECT` auf `list_views.*`,
+  `dbo.T_USER`, `dbo.T_CODE`/`T_CODE_NEXT` und `EXECUTE` auf
+  `stored_proc.sp_G15_*`. (Lokal verifiziert: Lese-Pfade + 108 User aus
+  `dbo.T_USER` funktionieren.)
 - Free-Tier: Die App schlaeft bei Inaktivitaet ein (~30 s Aufwachzeit) — vor
   einer Vorstellung einmal aufwecken.
-- Die HdM-DB muss oeffentlich erreichbar sein (ist sie); kein VPN noetig.
+- Die HdM-DB ist oeffentlich erreichbar (kein VPN noetig).

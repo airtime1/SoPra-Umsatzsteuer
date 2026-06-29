@@ -1,12 +1,15 @@
 """
 Datenbank-Wrapper. Liest Credentials aus .env und stellt drei Connections bereit:
 
-- get_app_conn():     ueber ERP_REMOTE_USER (read/write/execute). Fuer das laufende UI.
-- get_dev_conn():     persoenlicher User auf ERPDEV26S. Nur fuer Analyse/Deploy-Skripte.
-- get_sandbox_conn(): eigene Sandbox. Fuer lokale Deploys und Tests.
+- get_app_conn():     ueber ERP_REMOTE_USER. Fuer das laufende UI. Nutzt **pymssql**
+                      (reiner Python-Treiber, kein System-ODBC-Treiber noetig ->
+                      laeuft auf Streamlit Community Cloud ohne packages.txt).
+- get_dev_conn():     persoenlicher User auf ERPDEV26S. Nur fuer Analyse/Deploy-Skripte (pyodbc).
+- get_sandbox_conn(): eigene Sandbox. Fuer lokale Deploys und Tests (pyodbc).
 
-Alle Aufrufe an Stored Procedures / Functions laufen ueber kleine Helper, damit die UI nicht
-direkt mit pyodbc-Cursor-Code hantieren muss.
+Hinweis: Die UI-Service-Schicht (app/services/vat.py) ist auf den pymssql-Platzhalter
+%s ausgelegt und nutzt die APP-Connection. Die Deploy-/Analyse-Skripte nutzen weiter
+pyodbc (qmark `?`).
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ import os
 from contextlib import contextmanager
 from typing import Iterator
 
+import pymssql
 import pyodbc
 from dotenv import load_dotenv
 
@@ -23,25 +27,18 @@ load_dotenv()
 
 def _build_conn_str(server: str, database: str, user: str, password: str) -> str:
     driver = os.getenv("ODBC_DRIVER", "ODBC Driver 17 for SQL Server")
-    parts = [
-        f"DRIVER={{{driver}}}",
-        f"SERVER={server}",
-        f"DATABASE={database}",
-        f"UID={user}",
-        f"PWD={password}",
-        "TrustServerCertificate=yes",
-    ]
-    # FreeTDS (Linux / Streamlit Cloud) braucht einen expliziten Port und die
-    # TDS-Protokollversion. Lokal mit dem Microsoft-ODBC-Treiber bleibt der
-    # String unveraendert (diese Keywords werden dort nicht ergaenzt).
-    if "tdsodbc" in driver.lower() or driver.lower() == "freetds":
-        parts.append(f"PORT={os.getenv('DB_PORT', '1433')}")
-        parts.append("TDS_Version=7.4")
-    return ";".join(parts) + ";"
+    return (
+        f"DRIVER={{{driver}}};"
+        f"SERVER={server};"
+        f"DATABASE={database};"
+        f"UID={user};"
+        f"PWD={password};"
+        "TrustServerCertificate=yes;"
+    )
 
 
-def _conn(prefix: str) -> pyodbc.Connection:
-    """Build a connection using the env vars with the given prefix (DEV, SANDBOX, APP)."""
+def _pyodbc_conn(prefix: str) -> pyodbc.Connection:
+    """pyodbc-Connection ueber die env vars mit dem gegebenen Prefix (DEV, SANDBOX)."""
     server = os.environ[f"{prefix}_SERVER"]
     database = os.environ[f"{prefix}_DATABASE"]
     user = os.environ[f"{prefix}_USER"]
@@ -50,9 +47,15 @@ def _conn(prefix: str) -> pyodbc.Connection:
 
 
 @contextmanager
-def get_app_conn() -> Iterator[pyodbc.Connection]:
-    """Frontend-Connection mit ERP_REMOTE_USER."""
-    conn = _conn("APP")
+def get_app_conn() -> Iterator["pymssql.Connection"]:
+    """Frontend-Connection mit ERP_REMOTE_USER ueber pymssql."""
+    conn = pymssql.connect(
+        server=os.environ["APP_SERVER"],
+        port=int(os.getenv("DB_PORT", "1433")),
+        user=os.environ["APP_USER"],
+        password=os.environ["APP_PASSWORD"],
+        database=os.environ["APP_DATABASE"],
+    )
     try:
         yield conn
     finally:
@@ -62,7 +65,7 @@ def get_app_conn() -> Iterator[pyodbc.Connection]:
 @contextmanager
 def get_dev_conn() -> Iterator[pyodbc.Connection]:
     """Persoenliche Dev-Connection auf ERPDEV26S. Fuer Deploy-Skripte."""
-    conn = _conn("DEV")
+    conn = _pyodbc_conn("DEV")
     try:
         yield conn
     finally:
@@ -72,7 +75,7 @@ def get_dev_conn() -> Iterator[pyodbc.Connection]:
 @contextmanager
 def get_sandbox_conn() -> Iterator[pyodbc.Connection]:
     """Eigene Sandbox. Fuer lokale Tests."""
-    conn = _conn("SANDBOX")
+    conn = _pyodbc_conn("SANDBOX")
     try:
         yield conn
     finally:
@@ -80,8 +83,12 @@ def get_sandbox_conn() -> Iterator[pyodbc.Connection]:
 
 
 @contextmanager
-def get_active_conn() -> Iterator[pyodbc.Connection]:
-    """DB-Connection fuer die App, gesteuert ueber APP_DB_PROFILE."""
+def get_active_conn() -> Iterator[object]:
+    """DB-Connection fuer die App, gesteuert ueber APP_DB_PROFILE.
+
+    Default `app` -> pymssql. `dev`/`sandbox` nutzen pyodbc und sind nur fuer
+    lokale Hilfszwecke gedacht (die vat.py-Queries sind auf pymssql/%s ausgelegt).
+    """
     profile = os.getenv("APP_DB_PROFILE", "app").strip().lower()
     connections = {
         "app": get_app_conn,
