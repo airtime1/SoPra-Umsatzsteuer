@@ -23,14 +23,21 @@ load_dotenv()
 
 def _build_conn_str(server: str, database: str, user: str, password: str) -> str:
     driver = os.getenv("ODBC_DRIVER", "ODBC Driver 17 for SQL Server")
-    return (
-        f"DRIVER={{{driver}}};"
-        f"SERVER={server};"
-        f"DATABASE={database};"
-        f"UID={user};"
-        f"PWD={password};"
-        "TrustServerCertificate=yes;"
-    )
+    parts = [
+        f"DRIVER={{{driver}}}",
+        f"SERVER={server}",
+        f"DATABASE={database}",
+        f"UID={user}",
+        f"PWD={password}",
+        "TrustServerCertificate=yes",
+    ]
+    # FreeTDS (Linux / Streamlit Cloud) braucht einen expliziten Port und die
+    # TDS-Protokollversion. Lokal mit dem Microsoft-ODBC-Treiber bleibt der
+    # String unveraendert (diese Keywords werden dort nicht ergaenzt).
+    if "tdsodbc" in driver.lower() or driver.lower() == "freetds":
+        parts.append(f"PORT={os.getenv('DB_PORT', '1433')}")
+        parts.append("TDS_Version=7.4")
+    return ";".join(parts) + ";"
 
 
 def _conn(prefix: str) -> pyodbc.Connection:
