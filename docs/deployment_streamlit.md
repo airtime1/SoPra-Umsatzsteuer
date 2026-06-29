@@ -9,9 +9,15 @@ ODBC-Treiber, kein statisches/Worker-Hosting.
 
 - `requirements.txt` — Python-Pakete (inkl. `pyodbc`).
 - `packages.txt` — System-Pakete (apt) fuer den SQL-Server-Treiber in der Cloud:
-  `unixodbc`, `freetds-bin`, `freetds-dev`, `tdsodbc`. Damit steht der
-  **FreeTDS**-ODBC-Treiber bereit (Microsofts `msodbcsql` laesst sich auf
-  Streamlit Cloud nicht installieren).
+  nur `freetds-bin` und `tdsodbc`. Damit steht der **FreeTDS**-ODBC-Treiber
+  bereit (Microsofts `msodbcsql` laesst sich auf Streamlit Cloud nicht
+  installieren).
+  - **Wichtig:** unixODBC (`libodbc2`) ist im Cloud-Image bereits vorinstalliert.
+    `unixodbc`/`freetds-dev` NICHT auflisten — `freetds-dev` zieht
+    `unixodbc-dev` aus dem Microsoft-apt-Repo nach, das vom alten `libodbc1`
+    abhaengt und mit dem vorhandenen `libodbc2` kollidiert
+    (`trying to overwrite '/usr/lib/.../libodbc.so.2.0.0'`) -> Build bricht ab.
+    Zur Laufzeit brauchen wir keine Dev-Header (pyodbc ist ein fertiges Wheel).
 
 ## App anlegen (share.streamlit.io)
 
