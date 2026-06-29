@@ -58,6 +58,21 @@ streamlit run app\main.py
 
 Die finale App nutzt den vorgesehenen APP-Zugang auf `ERPDEV26S` direkt. Sandbox- und Dev-Connection-Helfer bleiben für Deploy-/Analyse-Skripte vorhanden, sind aber nicht die Laufzeitbasis der UI.
 
+### 4.1 Streamlit Community Cloud
+
+Für Streamlit Community Cloud ist `app/main.py` der Entry Point. `requirements.txt`, `runtime.txt` und `packages.txt` liegen im Repository-Root, damit Python 3.11 sowie die Linux-/ODBC-Abhängigkeiten für `pyodbc` installiert werden.
+
+Die DB-Konfiguration wird in den Streamlit-Secrets als Root-Level TOML gepflegt, damit sie als Environment-Variablen verfügbar ist:
+
+```toml
+APP_DB_PROFILE = "app"
+APP_SERVER = "edu.hdm-server.eu"
+APP_DATABASE = "ERPDEV26S"
+APP_USER = "ERP_REMOTE_USER"
+APP_PASSWORD = "<APP-Passwort>"
+ODBC_DRIVER = "FreeTDS"
+```
+
 ### 5. Demo-Workflow prüfen
 
 - In der App: Übersicht öffnen, neue abrechenbare Periode erstellen, `Abrechnung auswählen` prüfen, freigeben, abschließen.
