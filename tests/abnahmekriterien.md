@@ -17,7 +17,7 @@ Basierend auf MS4 Kap. 9 (SPC-1 bis SPC-6), ergänzt um projektinterne Kriterien
 |---|---|---|
 | **SPC-7** | Periode kann erst ab dem 10. des Folgemonats abgerechnet werden. | `stored_proc.sp_G15_create_vat_statement` für aktuelle Periode wirft Fehler 50001 vor dem 10., funktioniert ab dem 10. |
 | **SPC-8** | DRAFT-Abrechnungen können beliebig oft neu berechnet werden. | Erneuter Aufruf von `stored_proc.sp_G15_create_vat_statement` für DRAFT-Periode löscht alte Items, erzeugt neue, lässt die Kopf-ID unverändert. |
-| **SPC-9** | Rollen-Berechtigung wird beim Statuswechsel geprüft. | Nur CFO darf DRAFT→APPROVED/Rückgabe, nur Leitung FiBu darf APPROVED→PAID. Der technische Rollencheck liegt in den Stored Procedures und liest `T_USER.SECURITYLEVEL` sowie `T_CODE_NEXT.SECURITY_LEVEL`. |
+| **SPC-9** | Rollen-Berechtigung wird beim Statuswechsel geprüft. | Security-Level wirken hierarchisch: Level 1 darf Level-1-Aktionen, Level 2 zusätzlich Level-2-Aktionen, Level 3 zusätzlich Level-3-Aktionen. Der technische Rollencheck liegt in den Stored Procedures und liest `T_USER.SECURITYLEVEL` sowie den Mindest-Level aus `T_CODE_NEXT.SECURITY_LEVEL`. |
 
 ## Aktueller Teststand
 

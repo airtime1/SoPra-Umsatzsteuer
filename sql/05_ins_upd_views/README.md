@@ -1,6 +1,6 @@
 # ins_views / upd_views — Schreib-Wrapper
 
-`ERP_REMOTE_USER` (Frontend) hat nur read/write/execute auf bestimmten Objekten. Direkter Schreibzugriff auf `dbo.T_VAT_STATEMENT` ist vermutlich nicht erlaubt — alle Schreibwege gehen über Stored Procs oder Views in `ins_views.` / `upd_views.`.
+Frontend-User haben nur definierte Read-/Execute-Rechte auf bestimmten Objekten. Direkter Schreibzugriff auf `dbo.T_VAT_STATEMENT` ist nicht vorgesehen — alle Schreibwege gehen über Stored Procs oder Views in `ins_views.` / `upd_views.`.
 
 **Status: OFFEN** — wir wissen noch nicht, welche dieser Wrapper tatsächlich nötig sind. Klärung mit Architekt steht aus (siehe `docs/offene_fragen.md`).
 

@@ -13,4 +13,4 @@ Aktuelle Dateien:
 |---|---|
 | `fn_g15_calculate_vat_balance_basic.sql` | Sechs Ergebniszeilen, alle `PASS` |
 | `sp_g15_create_vat_statement_demo.sql` | Drei Ergebniszeilen, alle `PASS` |
-| `sp_status_workflow_roles_demo.sql` | Fuenf Ergebniszeilen, alle `PASS` |
+| `sp_status_workflow_roles_demo.sql` | Sieben Ergebniszeilen, alle `PASS` |

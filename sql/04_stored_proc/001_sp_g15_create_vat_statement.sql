@@ -5,6 +5,7 @@
 --
 -- Ablauf:
 --   1. fn_G15_check_vat_period pruefen.
+--   1b. Rollenpruefung: SECURITYLEVEL >= 1 (hierarchisch).
 --   2. Vorhandener DRAFT -> Items loeschen, Kopf zuruecksetzen.
 --      Sonst Kopf neu anlegen.
 --   3. Items aus list_views.V_LIST_G15_OUTPUT_VAT (USt) und
@@ -42,6 +43,16 @@ BEGIN
     DECLARE @statement_id INT;
     DECLARE @period_start DATE = CAST(@vat_period + '-01' AS DATE);
     DECLARE @period_end   DATE = EOMONTH(@period_start);
+    DECLARE @current_db_user VARCHAR(50) = CAST(SUSER_SNAME() AS VARCHAR(50));
+
+    IF @created_by IS NOT NULL AND @created_by <> @current_db_user
+    BEGIN
+        THROW 50024, 'Benutzerparameter stimmt nicht mit dem aktuellen DB-Login ueberein.', 1;
+        RETURN;
+    END
+
+    SET @created_by = @current_db_user;
+
     DECLARE @creator_security_level INT = dbo.fn_get_user_securitylevel(@created_by);
 
     IF @creator_security_level IS NULL
@@ -50,7 +61,7 @@ BEGIN
         RETURN;
     END
 
-    IF @creator_security_level <> 1
+    IF @creator_security_level < 1
     BEGIN
         THROW 50021, 'Benutzer hat nicht die benoetigte Rolle fuer diese Aktion.', 1;
         RETURN;

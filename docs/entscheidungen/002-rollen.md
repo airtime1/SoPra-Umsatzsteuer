@@ -2,6 +2,7 @@
 
 - **Status:** akzeptiert
 - **Datum:** 2026-06-03
+- **Ergänzt durch:** ADR-011 (DB-Login und hierarchische Rollenlogik)
 
 ## Kontext
 
@@ -23,9 +24,10 @@ Begründung:
 
 ## Konsequenzen
 
-- Berechtigungsmatrix in DB (Rollencheck z. B. in Stored Proc oder über `T_USER_ROLE`-Lookup):
-  - `Sachbearbeiter` darf: `INSERT` auf `T_VAT_STATEMENT`, Status `DRAFT` setzen
-  - `CFO` darf: Status `DRAFT → APPROVED`, `APPROVED → DRAFT` (Zurückweisung)
-  - `Leitung FiBu` darf: Status `APPROVED → PAID`
-- UI muss die Buttons rollenabhängig ein-/ausblenden.
+- Berechtigungsmatrix in DB:
+  - Level 1 (`Sachbearbeitung`) darf Abrechnungen anlegen und `DRAFT` neu berechnen.
+  - Level 2 (`Leitung FiBu`) darf zusätzlich Level-2-Aktionen wie `APPROVED → PAID`.
+  - Level 3 (`CFO`) darf zusätzlich Level-3-Aktionen wie `DRAFT → APPROVED` und `APPROVED → DRAFT`.
+- Hohe Rollen schließen niedrige Berechtigungen ein (`actual_level >= required_level`, siehe ADR-011).
+- UI muss die Buttons rollenabhängig nach derselben Hierarchie ein-/ausblenden.
 - Auditspur: `CREATED_BY/AT`, `APPROVED_BY/AT` (CFO), `CLOSED_BY/AT` (FiBu) — Spalten in `T_VAT_STATEMENT`.

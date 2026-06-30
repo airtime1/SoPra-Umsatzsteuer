@@ -339,6 +339,16 @@ BEGIN
     DECLARE @statement_id INT;
     DECLARE @period_start DATE = CAST(@vat_period + '-01' AS DATE);
     DECLARE @period_end   DATE = EOMONTH(@period_start);
+    DECLARE @current_db_user VARCHAR(50) = CAST(SUSER_SNAME() AS VARCHAR(50));
+
+    IF @created_by IS NOT NULL AND @created_by <> @current_db_user
+    BEGIN
+        THROW 50024, 'Benutzerparameter stimmt nicht mit dem aktuellen DB-Login ueberein.', 1;
+        RETURN;
+    END
+
+    SET @created_by = @current_db_user;
+
     DECLARE @creator_security_level INT = dbo.fn_get_user_securitylevel(@created_by);
 
     IF @creator_security_level IS NULL
@@ -347,7 +357,7 @@ BEGIN
         RETURN;
     END
 
-    IF @creator_security_level <> 1
+    IF @creator_security_level < 1
     BEGIN
         THROW 50021, 'Benutzer hat nicht die benoetigte Rolle fuer diese Aktion.', 1;
         RETURN;
@@ -467,7 +477,7 @@ END;
 GO
 
 -- ----------------------------------------------------------------------------
--- stored_proc.sp_G15_approve_vat_statement — DRAFT -> APPROVED (CFO, Stufe 3).
+-- stored_proc.sp_G15_approve_vat_statement — DRAFT -> APPROVED (mindestens CFO-Level, Stufe 3).
 -- Transitionspruefung ueber zentrale dbo.fn_chk_status_folge.
 -- (Interne Doku-Quelle: sql/04_stored_proc/002_sp_g15_approve_vat_statement.sql)
 -- ----------------------------------------------------------------------------
@@ -494,6 +504,14 @@ BEGIN
         RETURN;
     END
 
+    DECLARE @current_db_user VARCHAR(50) = CAST(SUSER_SNAME() AS VARCHAR(50));
+    IF @approved_by IS NOT NULL AND @approved_by <> @current_db_user
+    BEGIN
+        THROW 50024, 'Benutzerparameter stimmt nicht mit dem aktuellen DB-Login ueberein.', 1;
+        RETURN;
+    END
+    SET @approved_by = @current_db_user;
+
     DECLARE @required_security_level INT = (
         SELECT SECURITY_LEVEL FROM dbo.T_CODE_NEXT
         WHERE CODE_ID = @old_id AND CODE_NEXT_ID = @new_id
@@ -506,7 +524,7 @@ BEGIN
         RETURN;
     END
 
-    IF @required_security_level IS NULL OR @actual_security_level <> @required_security_level
+    IF @required_security_level IS NULL OR @actual_security_level < @required_security_level
     BEGIN
         THROW 50021, 'Benutzer hat nicht die benoetigte Rolle fuer diese Aktion.', 1;
         RETURN;
@@ -541,7 +559,7 @@ END;
 GO
 
 -- ----------------------------------------------------------------------------
--- stored_proc.sp_G15_pay_vat_statement — APPROVED -> PAID (Leitung FiBu, Stufe 2).
+-- stored_proc.sp_G15_pay_vat_statement — APPROVED -> PAID (mindestens Leitung FiBu-Level, Stufe 2).
 -- Transitionspruefung ueber zentrale dbo.fn_chk_status_folge.
 -- (Interne Doku-Quelle: sql/04_stored_proc/003_sp_g15_pay_vat_statement.sql)
 -- ----------------------------------------------------------------------------
@@ -568,6 +586,14 @@ BEGIN
         RETURN;
     END
 
+    DECLARE @current_db_user VARCHAR(50) = CAST(SUSER_SNAME() AS VARCHAR(50));
+    IF @paid_by IS NOT NULL AND @paid_by <> @current_db_user
+    BEGIN
+        THROW 50024, 'Benutzerparameter stimmt nicht mit dem aktuellen DB-Login ueberein.', 1;
+        RETURN;
+    END
+    SET @paid_by = @current_db_user;
+
     DECLARE @required_security_level INT = (
         SELECT SECURITY_LEVEL FROM dbo.T_CODE_NEXT
         WHERE CODE_ID = @old_id AND CODE_NEXT_ID = @new_id
@@ -580,7 +606,7 @@ BEGIN
         RETURN;
     END
 
-    IF @required_security_level IS NULL OR @actual_security_level <> @required_security_level
+    IF @required_security_level IS NULL OR @actual_security_level < @required_security_level
     BEGIN
         THROW 50021, 'Benutzer hat nicht die benoetigte Rolle fuer diese Aktion.', 1;
         RETURN;
@@ -615,7 +641,7 @@ END;
 GO
 
 -- ----------------------------------------------------------------------------
--- stored_proc.sp_G15_reject_vat_statement — APPROVED -> DRAFT (CFO, Stufe 3).
+-- stored_proc.sp_G15_reject_vat_statement — APPROVED -> DRAFT (mindestens CFO-Level, Stufe 3).
 -- Transitionspruefung ueber zentrale dbo.fn_chk_status_folge.
 -- (Interne Doku-Quelle: sql/04_stored_proc/004_sp_g15_reject_vat_statement.sql)
 -- ----------------------------------------------------------------------------
@@ -642,6 +668,14 @@ BEGIN
         RETURN;
     END
 
+    DECLARE @current_db_user VARCHAR(50) = CAST(SUSER_SNAME() AS VARCHAR(50));
+    IF @rejected_by IS NOT NULL AND @rejected_by <> @current_db_user
+    BEGIN
+        THROW 50024, 'Benutzerparameter stimmt nicht mit dem aktuellen DB-Login ueberein.', 1;
+        RETURN;
+    END
+    SET @rejected_by = @current_db_user;
+
     DECLARE @required_security_level INT = (
         SELECT SECURITY_LEVEL FROM dbo.T_CODE_NEXT
         WHERE CODE_ID = @old_id AND CODE_NEXT_ID = @new_id
@@ -654,7 +688,7 @@ BEGIN
         RETURN;
     END
 
-    IF @required_security_level IS NULL OR @actual_security_level <> @required_security_level
+    IF @required_security_level IS NULL OR @actual_security_level < @required_security_level
     BEGIN
         THROW 50021, 'Benutzer hat nicht die benoetigte Rolle fuer diese Aktion.', 1;
         RETURN;
@@ -703,4 +737,3 @@ GO
 --       (Skonto-Flag SKONTO_BERECHTIGT_YN ist seit 23.06. da)
 --       -> Stub in V_LIST_G15_VAT_SKONTO durch aktiven SELECT ersetzen (ADR-010).
 -- ============================================================================
-

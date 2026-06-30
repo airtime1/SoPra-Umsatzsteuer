@@ -1,15 +1,13 @@
 """
-Datenbank-Wrapper. Liest Credentials aus .env und stellt drei Connections bereit:
+Datenbank-Wrapper. Liest Zielsysteme aus .env und stellt Connections bereit:
 
-- get_app_conn():     ueber ERP_REMOTE_USER. Fuer das laufende UI. Nutzt **pymssql**
-                      (reiner Python-Treiber, kein System-ODBC-Treiber noetig ->
-                      laeuft auf Streamlit Community Cloud ohne packages.txt).
+- get_user_conn():    echter DB-User aus dem Streamlit-Login. Fuer das laufende UI.
+                      Nutzt **pymssql** (reiner Python-Treiber, kein System-ODBC).
 - get_dev_conn():     persoenlicher User auf ERPDEV26S. Nur fuer Analyse/Deploy-Skripte (pyodbc).
 - get_sandbox_conn(): eigene Sandbox. Fuer lokale Deploys und Tests (pyodbc).
 
-Hinweis: Die UI-Service-Schicht (app/services/vat.py) ist auf den pymssql-Platzhalter
-%s ausgelegt und nutzt die APP-Connection. Die Deploy-/Analyse-Skripte nutzen weiter
-pyodbc (qmark `?`).
+Die UI-Service-Schicht (app/services/vat.py) ist auf den pymssql-Platzhalter
+%s ausgelegt. Die Deploy-/Analyse-Skripte nutzen weiter pyodbc (qmark `?`).
 """
 
 from __future__ import annotations
@@ -23,6 +21,10 @@ import pyodbc
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+SESSION_USERNAME_KEY = "db_username"
+SESSION_PASSWORD_KEY = "db_password"
 
 
 def _build_conn_str(server: str, database: str, user: str, password: str) -> str:
@@ -47,19 +49,33 @@ def _pyodbc_conn(prefix: str) -> pyodbc.Connection:
 
 
 @contextmanager
-def get_app_conn() -> Iterator["pymssql.Connection"]:
-    """Frontend-Connection mit ERP_REMOTE_USER ueber pymssql."""
+def get_user_conn(username: str, password: str) -> Iterator["pymssql.Connection"]:
+    """Frontend-Connection mit den echten DB-Credentials des eingeloggten Users."""
     conn = pymssql.connect(
         server=os.environ["APP_SERVER"],
         port=int(os.getenv("DB_PORT", "1433")),
-        user=os.environ["APP_USER"],
-        password=os.environ["APP_PASSWORD"],
+        user=username,
+        password=password,
         database=os.environ["APP_DATABASE"],
     )
     try:
         yield conn
     finally:
         conn.close()
+
+
+@contextmanager
+def get_authenticated_conn() -> Iterator["pymssql.Connection"]:
+    """Streamlit-Session-Connection des eingeloggten DB-Users."""
+    import streamlit as st
+
+    username = st.session_state.get(SESSION_USERNAME_KEY)
+    password = st.session_state.get(SESSION_PASSWORD_KEY)
+    if not username or not password:
+        raise RuntimeError("Nicht angemeldet. Bitte zuerst mit DB-Zugangsdaten anmelden.")
+
+    with get_user_conn(str(username), str(password)) as conn:
+        yield conn
 
 
 @contextmanager
@@ -80,27 +96,3 @@ def get_sandbox_conn() -> Iterator[pyodbc.Connection]:
         yield conn
     finally:
         conn.close()
-
-
-@contextmanager
-def get_active_conn() -> Iterator[object]:
-    """DB-Connection fuer die App, gesteuert ueber APP_DB_PROFILE.
-
-    Default `app` -> pymssql. `dev`/`sandbox` nutzen pyodbc und sind nur fuer
-    lokale Hilfszwecke gedacht (die vat.py-Queries sind auf pymssql/%s ausgelegt).
-    """
-    profile = os.getenv("APP_DB_PROFILE", "app").strip().lower()
-    connections = {
-        "app": get_app_conn,
-        "dev": get_dev_conn,
-        "sandbox": get_sandbox_conn,
-    }
-
-    if profile not in connections:
-        allowed = ", ".join(sorted(connections))
-        raise ValueError(
-            f"Unbekanntes APP_DB_PROFILE '{profile}'. Erlaubte Werte: {allowed}."
-        )
-
-    with connections[profile]() as conn:
-        yield conn

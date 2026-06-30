@@ -34,8 +34,8 @@ END;
 
 -- Erlaubte Statusuebergaenge in dbo.T_CODE_NEXT
 -- Spalten: CODE_TYPE, CODE_ID, CODE_NEXT_ID, SECURITY_LEVEL
--- SECURITY_LEVEL entspricht der Rolle, die den Wechsel ausloesen darf
--- (siehe ADR-002: 3 = CFO, 2 = Leitung FiBu).
+-- SECURITY_LEVEL entspricht dem Mindest-Level, das den Wechsel ausloesen darf
+-- (siehe ADR-002: 3 = CFO, 2 = Leitung FiBu; hoehere Level schliessen niedrigere ein).
 DECLARE @draft_status_id INT = (
     SELECT ID_CODE FROM dbo.T_CODE WHERE CODE_TYPE = 'VAT_STATUS' AND CODE_NAME = 'DRAFT'
 );

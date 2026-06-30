@@ -23,17 +23,17 @@ st.set_page_config(
 )
 
 ui.apply_theme()
+user = ui.require_login()
 ui.render_sidebar("new")
 
 try:
-    profiles = vat.list_fachkraefte()
     statements = vat.list_statements()
     period_options = vat.list_period_options()
 except Exception as exc:
     ui.show_error_dialog("DB-Zugriff fehlgeschlagen", exc)
     st.stop()
 
-profile = ui.render_header("Umsatzsteuerabrechnung", profiles)
+user = ui.render_header("Umsatzsteuerabrechnung", user)
 
 valid_options = period_options[period_options["CHECK_RESULT"] == 0].copy()
 valid_options = valid_options.sort_values("VAT_PERIOD", ascending=False)
@@ -71,7 +71,7 @@ with st.container(border=True):
 
     create_clicked = False
     with form_cols[2]:
-        if profile.level == 1:
+        if ui.has_security_level(user, 1):
             create_clicked = st.button(
                 "Abrechnung anlegen",
                 type="primary",
@@ -94,7 +94,7 @@ if create_clicked and selected_period:
                 "Die Datenbanklogik lässt diese Periode aktuell nicht zur Abrechnung zu.",
             )
         else:
-            new_id = vat.create_statement(str(selected_period), profile.username)
+            new_id = vat.create_statement(str(selected_period), user.username)
             st.session_state["selected_statement_id"] = int(new_id)
             st.session_state["flash_success"] = "Abrechnung wurde angelegt."
             st.switch_page("pages/3_Abrechnung_auswählen.py")

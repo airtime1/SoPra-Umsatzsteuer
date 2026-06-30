@@ -1,8 +1,9 @@
 """
 Duenne Service-Schicht zwischen Streamlit und der APP-Datenbank.
 
-Die App liest live aus ERPDEV26S ueber den APP-Zugang. Schreibende Aktionen
-laufen ausschliesslich ueber die vorhandenen G15-Stored-Procedures.
+Die App liest live aus ERPDEV26S mit den DB-Credentials des eingeloggten
+Users. Schreibende Aktionen laufen ausschliesslich ueber die vorhandenen
+G15-Stored-Procedures.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ import warnings
 
 import pandas as pd
 
-from app.db import get_app_conn
+from app.db import get_authenticated_conn, get_user_conn
 
 
 STATEMENT_VIEW = "list_views.V_LIST_G15_VAT_STATEMENT"
@@ -33,23 +34,15 @@ PAY_PROC = "stored_proc.sp_G15_pay_vat_statement"
 REJECT_PROC = "stored_proc.sp_G15_reject_vat_statement"
 
 
-ROLE_LABELS = {
-    1: "Sachbearbeitung",
-    2: "Leitung FiBu",
-    3: "CFO",
-}
-
-
 @dataclass(frozen=True)
-class Fachkraft:
-    label: str
-    level: int
+class AuthenticatedUser:
     username: str
+    level: int
     role: str
 
 
 def _read_sql(sql: str, params: list[Any] | tuple[Any, ...] | None = None) -> pd.DataFrame:
-    with get_app_conn() as conn:
+    with get_authenticated_conn() as conn:
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -57,6 +50,51 @@ def _read_sql(sql: str, params: list[Any] | tuple[Any, ...] | None = None) -> pd
                 category=UserWarning,
             )
             return pd.read_sql(sql, conn, params=params)
+
+
+def authenticate_user(username: str, password: str) -> AuthenticatedUser:
+    """
+    Prueft echte DB-Credentials und liest den Security-Level aus der zentralen DB-Logik.
+
+    SUSER_SNAME() ist die tatsaechliche SQL-Server-Login-Identitaet der Verbindung.
+    dbo.fn_get_user_securitylevel bleibt die massgebliche Quelle fuer G15-Rollen.
+    """
+
+    if not username.strip() or not password:
+        raise ValueError("Benutzername und Passwort muessen ausgefuellt sein.")
+
+    sql = """
+        DECLARE @login_name VARCHAR(50) = CAST(SUSER_SNAME() AS VARCHAR(50));
+        DECLARE @security_level INT = dbo.fn_get_user_securitylevel(@login_name);
+
+        SELECT
+            @login_name AS USERNAME,
+            @security_level AS SECURITYLEVEL,
+            CASE
+                WHEN @security_level = 1 THEN 'Sachbearbeitung'
+                WHEN @security_level = 2 THEN 'Leitung FiBu'
+                WHEN @security_level = 3 THEN 'CFO'
+                WHEN @security_level IS NULL OR @security_level < 1 THEN 'Nicht berechtigt'
+                ELSE CONCAT('Level ', @security_level)
+            END AS VAT_ROLE
+    """
+    with get_user_conn(username.strip(), password) as conn:
+        cur = conn.cursor(as_dict=True)
+        cur.execute(sql)
+        row = cur.fetchone()
+
+    if row is None:
+        raise RuntimeError("Benutzer konnte nicht aus der Datenbank ermittelt werden.")
+
+    level = row.get("SECURITYLEVEL")
+    if level is None or int(level) < 1:
+        raise PermissionError("Benutzer hat keine Umsatzsteuer-Berechtigung.")
+
+    return AuthenticatedUser(
+        username=str(row["USERNAME"]),
+        level=int(level),
+        role=str(row["VAT_ROLE"]),
+    )
 
 
 def list_statements() -> pd.DataFrame:
@@ -128,71 +166,12 @@ def list_status_transitions() -> pd.DataFrame:
     return _read_sql(sql)
 
 
-def list_users() -> pd.DataFrame:
-    """
-    APP-seitig lesbare Demo-User fuer die Fachkraft-Auswahl.
-
-    Die DB hat aktuell keine G15-User-View; die APP-Connection darf aber die
-    nicht geheimen Spalten USERNAME und SECURITYLEVEL aus dbo.T_USER lesen.
-    """
-
-    sql = """
-        SELECT USERNAME, SECURITYLEVEL
-        FROM dbo.T_USER
-        WHERE SECURITYLEVEL IN (1, 2, 3)
-        ORDER BY SECURITYLEVEL, USERNAME
-    """
-    try:
-        users = _read_sql(sql)
-    except Exception:
-        # Falls die APP-Connection dbo.T_USER nicht lesen darf: leer zurueck,
-        # die UI faellt auf Default-Fachkraefte (fachb1/2/3) zurueck.
-        users = pd.DataFrame(columns=["USERNAME", "SECURITYLEVEL"])
-    if users.empty:
-        return pd.DataFrame(columns=["USERNAME", "SECURITYLEVEL", "VAT_ROLE"])
-
-    users["VAT_ROLE"] = users["SECURITYLEVEL"].map(ROLE_LABELS).fillna("Fachkraft")
-    return users
-
-
-def list_fachkraefte() -> list[Fachkraft]:
-    users = list_users()
-    profiles: list[Fachkraft] = []
-
-    for level in (1, 2, 3):
-        candidates = users[users["SECURITYLEVEL"] == level]
-        preferred_name = f"fachb{level}"
-        username = preferred_name
-        if not candidates.empty:
-            names = [str(name) for name in candidates["USERNAME"].tolist()]
-            username = preferred_name if preferred_name in names else names[0]
-
-        profiles.append(
-            Fachkraft(
-                label=f"Fachkraft {level}",
-                level=level,
-                username=username,
-                role=ROLE_LABELS[level],
-            )
-        )
-
-    return profiles
-
-
-def get_fachkraft_by_label(label: str | None) -> Fachkraft:
-    profiles = list_fachkraefte()
-    for profile in profiles:
-        if profile.label == label:
-            return profile
-    return profiles[0]
-
-
 def check_period(period: str, check_date: date | None = None) -> int:
     """Rueckgabe der DB-Function: 0 = zulaessig, 1 = gesperrt/ungueltig."""
 
     check_date = check_date or date.today()
     sql = f"SELECT {CHECK_PERIOD_FUNCTION}(%s, %s) AS CHECK_RESULT"
-    with get_app_conn() as conn:
+    with get_authenticated_conn() as conn:
         cur = conn.cursor()
         cur.execute(sql, (period, check_date))
         return int(cur.fetchone()[0])
@@ -200,7 +179,7 @@ def check_period(period: str, check_date: date | None = None) -> int:
 
 def calculate_balance(output_vat_total: Decimal | float, input_vat_total: Decimal | float) -> dict[str, Any]:
     sql = f"SELECT VAT_BALANCE, VAT_TYPE FROM {BALANCE_FUNCTION}(%s, %s)"
-    with get_app_conn() as conn:
+    with get_authenticated_conn() as conn:
         cur = conn.cursor()
         cur.execute(sql, (output_vat_total, input_vat_total))
         row = cur.fetchone()
@@ -326,7 +305,7 @@ def get_statement_history(statement_id: int) -> pd.DataFrame:
 
 def create_statement(period: str, created_by: str) -> int:
     """Ruft stored_proc.sp_G15_create_vat_statement auf. Gibt die neue ID zurueck."""
-    with get_active_conn() as conn:
+    with get_authenticated_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "EXEC stored_proc.sp_G15_create_vat_statement @vat_period = %s, @created_by = %s",
@@ -339,7 +318,7 @@ def create_statement(period: str, created_by: str) -> int:
 
 def approve_statement(statement_id: int, approved_by: str) -> None:
     """DRAFT -> APPROVED via stored_proc.sp_G15_approve_vat_statement."""
-    with get_active_conn() as conn:
+    with get_authenticated_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "EXEC stored_proc.sp_G15_approve_vat_statement @statement_id = %s, @approved_by = %s",
@@ -350,7 +329,7 @@ def approve_statement(statement_id: int, approved_by: str) -> None:
 
 def reject_statement(statement_id: int, rejected_by: str) -> None:
     """APPROVED -> DRAFT via stored_proc.sp_G15_reject_vat_statement."""
-    with get_active_conn() as conn:
+    with get_authenticated_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "EXEC stored_proc.sp_G15_reject_vat_statement @statement_id = %s, @rejected_by = %s",
@@ -361,7 +340,7 @@ def reject_statement(statement_id: int, rejected_by: str) -> None:
 
 def pay_statement(statement_id: int, paid_by: str) -> None:
     """APPROVED -> PAID via stored_proc.sp_G15_pay_vat_statement."""
-    with get_active_conn() as conn:
+    with get_authenticated_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "EXEC stored_proc.sp_G15_pay_vat_statement @statement_id = %s, @paid_by = %s",

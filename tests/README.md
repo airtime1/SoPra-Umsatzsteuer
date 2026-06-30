@@ -22,7 +22,7 @@ Dieser Ordner sammelt Testfall-Katalog, Abnahmekriterien und ausführbare SQL-Te
 
 1. Saubere Sandbox aufsetzen (`scripts/deploy_sandbox.py`). Der Deploy spielt `sql/99_seed/` mit ein.
 2. SQL-Tests aus `tests/sql/` ausführen und prüfen, dass jede Ergebniszeile `PASS` liefert.
-3. Streamlit mit `APP_DB_PROFILE=sandbox` starten und den Demo-Workflow in der UI durchgehen.
+3. Streamlit gegen die Ziel-DB starten und mit einem passenden DB-Testuser den Demo-Workflow in der UI durchgehen.
 4. Testfälle aus `test_cases.md` und Abnahmekriterien dokumentieren.
 
 ## Aktuell ausführbare SQL-Tests
