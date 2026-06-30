@@ -60,7 +60,7 @@ Die App nutzt `ERPDEV26S` als Zielsystem und meldet den Benutzer beim Start mit 
 
 ### 5. Demo-Workflow prüfen
 
-- In der App: Übersicht öffnen, neue abrechenbare Periode erstellen, `Abrechnung auswählen` prüfen, freigeben, abschließen.
+- In der App: Übersicht öffnen, neue abrechenbare Periode erstellen, `Abrechnung auswählen` prüfen, mit Skonto-Bestätigung freigeben, abschließen.
 - Per SQL: Tests aus `tests/sql/` gegen die Sandbox ausführen; die Demo-Tests erwarten in allen Ergebniszeilen `PASS`.
 
 ## Projektstruktur
