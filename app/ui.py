@@ -431,7 +431,7 @@ def apply_theme() -> None:
         }
 
         .item-grid {
-            grid-template-columns: minmax(168px, 1.55fr) 1.05fr 0.95fr 0.9fr 0.9fr 0.9fr;
+            grid-template-columns: minmax(168px, 1.7fr) 1fr 1fr 1fr;
         }
 
         .timeline {
@@ -1249,7 +1249,7 @@ def render_item_rows(items: pd.DataFrame, limit: int | None = 4) -> None:
             """
         <div class="mock-table">
             <div class="table-head item-grid">
-                <span>Art</span><span>Beleg</span><span>Datum</span><span>Netto</span><span>USt.</span><span>Brutto</span>
+                <span>Art</span><span>Beleg</span><span>Datum</span><span>USt.</span>
             </div>
         """
         ).strip()
@@ -1272,9 +1272,7 @@ def render_item_rows(items: pd.DataFrame, limit: int | None = 4) -> None:
                 <span class="item-type"><span class="direction-icon {direction}">{icon_svg(icon)}</span>{html.escape(label)}</span>
                 <span>{html.escape(str(row["SOURCE_INVOICE_ID"]))}</span>
                 <span>{html.escape(format_date(row["SOURCE_INVOICE_DATE"]))}</span>
-                <span>{html.escape(format_currency_zero(row.get("NET_AMOUNT")))}</span>
                 <span>{html.escape(format_currency_zero(row.get("TAX_AMOUNT")))}</span>
-                <span>{html.escape(format_currency_zero(row.get("GROSS_AMOUNT")))}</span>
             </div>
             """
             ).strip()
