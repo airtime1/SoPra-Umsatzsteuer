@@ -45,6 +45,7 @@ statement_ids = [int(row["VAT_STATEMENT_ID"]) for _, row in sorted_statements.it
 statement_by_id = {
     int(row["VAT_STATEMENT_ID"]): row for _, row in sorted_statements.iterrows()
 }
+STATEMENT_SELECTBOX_KEY = "selected_statement_selectbox_id"
 
 
 def format_statement_option(statement_id: int) -> str:
@@ -53,6 +54,14 @@ def format_statement_option(statement_id: int) -> str:
         f"{row['VAT_PERIOD']} (ID: {ui.format_id(row['VAT_STATEMENT_ID'])}) "
         f"– {ui.status_label(row['VAT_STATUS'])}"
     )
+
+
+def sync_selected_statement_from_selectbox() -> None:
+    selected = st.session_state.get(STATEMENT_SELECTBOX_KEY)
+    if selected is None:
+        st.session_state.pop("selected_statement_id", None)
+        return
+    st.session_state["selected_statement_id"] = int(selected)
 
 
 @st.dialog("Skonto-Hinweis vor der Freigabe")
@@ -98,28 +107,58 @@ with st.container(border=True):
     query_statement_id = st.query_params.get("statement_id")
     if query_statement_id is not None:
         try:
-            st.session_state["selected_statement_id"] = int(query_statement_id)
+            query_id = int(query_statement_id)
         except (TypeError, ValueError):
             st.session_state.pop("selected_statement_id", None)
+            st.session_state.pop(STATEMENT_SELECTBOX_KEY, None)
+        else:
+            if query_id in statement_ids:
+                st.session_state["selected_statement_id"] = query_id
+                st.session_state[STATEMENT_SELECTBOX_KEY] = query_id
+            else:
+                st.session_state.pop("selected_statement_id", None)
+                st.session_state.pop(STATEMENT_SELECTBOX_KEY, None)
+        try:
+            del st.query_params["statement_id"]
+        except KeyError:
+            pass
 
     selected_from_state = st.session_state.get("selected_statement_id")
-    selected_index = None
-    if selected_from_state is not None and int(selected_from_state) in statement_ids:
-        selected_index = statement_ids.index(int(selected_from_state))
+    if selected_from_state is not None:
+        try:
+            selected_from_state = int(selected_from_state)
+        except (TypeError, ValueError):
+            st.session_state.pop("selected_statement_id", None)
+            st.session_state.pop(STATEMENT_SELECTBOX_KEY, None)
+        else:
+            if selected_from_state in statement_ids:
+                st.session_state[STATEMENT_SELECTBOX_KEY] = selected_from_state
+            else:
+                st.session_state.pop("selected_statement_id", None)
+                st.session_state.pop(STATEMENT_SELECTBOX_KEY, None)
 
     if statement_ids:
+        selectbox_kwargs = {
+            "key": STATEMENT_SELECTBOX_KEY,
+            "placeholder": "Abrechnung auswählen",
+            "format_func": format_statement_option,
+            "on_change": sync_selected_statement_from_selectbox,
+        }
+        if STATEMENT_SELECTBOX_KEY not in st.session_state:
+            selectbox_kwargs["index"] = None
         selected_id = st.selectbox(
             "Abrechnung",
             statement_ids,
-            index=selected_index,
-            placeholder="Abrechnung auswählen",
-            format_func=format_statement_option,
+            **selectbox_kwargs,
         )
     else:
+        st.session_state.pop("selected_statement_id", None)
+        st.session_state.pop(STATEMENT_SELECTBOX_KEY, None)
         selected_id = st.selectbox(
             "Abrechnung",
             [],
             index=None,
+            key=STATEMENT_SELECTBOX_KEY,
             placeholder="Keine Abrechnungen vorhanden",
         )
 
