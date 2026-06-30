@@ -7,15 +7,13 @@
 BEGIN TRANSACTION;
 
 BEGIN TRY
-    DECLARE @clerk VARCHAR(50) = (
-        SELECT TOP 1 USERNAME FROM dbo.T_USER WHERE SECURITYLEVEL = 1 ORDER BY USERNAME
-    );
+    DECLARE @current_user VARCHAR(50) = CAST(SUSER_SNAME() AS VARCHAR(50));
 
     DECLARE @statement TABLE (VAT_STATEMENT_ID INT);
     INSERT INTO @statement
     EXEC stored_proc.sp_G15_create_vat_statement
         @vat_period = '2026-04',
-        @created_by = @clerk;
+        @created_by = @current_user;
 
     DECLARE @statement_id INT = (SELECT TOP 1 VAT_STATEMENT_ID FROM @statement);
     DECLARE @has_payment_corrections BIT =

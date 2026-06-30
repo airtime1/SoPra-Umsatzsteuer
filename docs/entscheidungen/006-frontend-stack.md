@@ -16,17 +16,17 @@ HdM erlaubt für das Frontend Python, C# oder phpRunner. MS4 hatte `php-Runner` 
 
 ## Entscheidung
 
-**Option 2 (Python + Streamlit + pyodbc).**
+**Option 2 (Python + Streamlit; UI-Verbindung mit pymssql, Deploy-/Analyse-Skripte weiter mit pyodbc).**
 
 Begründung:
 - Geschwindigkeit: Streamlit baut formular- und listenorientierte UIs ohne HTML/CSS-Aufwand.
 - Wechsel-Sicherheit: Alle Logik liegt in der DB (Stored Procs/Functions), das Frontend ist nur Aufruf-Schicht. Ein Wechsel zu phpRunner ersetzt nur den `app/`-Ordner, alles in `sql/` bleibt.
 - Testing: pytest direkt gegen die Sandbox-DB ist Standard.
-- Risiko: Niedrig, wenn mindestens ein Teammitglied Python-Erfahrung hat. Bei `pyodbc`-Problemen ggf. auf `pymssql` ausweichen.
+- Risiko: Niedrig, wenn mindestens ein Teammitglied Python-Erfahrung hat. Die UI nutzt inzwischen `pymssql`, weil das ohne System-ODBC-Treiber auf Streamlit Community Cloud laeuft.
 
 ## Konsequenzen
 
-- `requirements.txt` mit `streamlit`, `pyodbc`, `python-dotenv`, `pandas`, `pytest`.
+- `requirements.txt` mit `streamlit`, `pymssql`, `pyodbc`, `python-dotenv`, `pandas`, `pytest`.
 - ODBC-Driver muss lokal installiert sein (Setup-Hinweis in README).
 - Stichtag für Wechsel zurück zu phpRunner: **muss noch festgelegt werden** — siehe `docs/offene_fragen.md`. Empfehlung: spätestens nach erfolgreicher Stored-Procs-/-Functions-Phase, weil danach ein Wechsel günstig ist.
 - Falls Wechsel: Streamlit-Pages 1:1 als phpRunner-Templates nachbauen, DB-Aufrufe sind identisch (Stored Procs).

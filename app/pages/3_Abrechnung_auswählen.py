@@ -24,17 +24,17 @@ st.set_page_config(
 )
 
 ui.apply_theme()
+user = ui.require_login()
 ui.render_sidebar("select")
 
 try:
-    profiles = vat.list_fachkraefte()
     statements = vat.list_statements()
     transitions = vat.list_status_transitions()
 except Exception as exc:
     ui.show_error_dialog("DB-Zugriff fehlgeschlagen", exc)
     st.stop()
 
-profile = ui.render_header("Umsatzsteuerabrechnung", profiles)
+user = ui.render_header("Umsatzsteuerabrechnung", user)
 
 flash = st.session_state.pop("flash_success", None)
 if flash:
@@ -122,13 +122,13 @@ with st.container(border=True):
     with header_cols[1]:
         action_labels: list[str] = []
 
-        if status == "DRAFT" and profile.level == 1:
+        if status == "DRAFT" and ui.has_security_level(user, 1):
             action_labels.append("recalculate")
-        if status == "DRAFT" and ui.transition_allowed(transitions, profile, "DRAFT", "APPROVED"):
+        if status == "DRAFT" and ui.transition_allowed(transitions, user, "DRAFT", "APPROVED"):
             action_labels.append("approve")
-        if status == "APPROVED" and ui.transition_allowed(transitions, profile, "APPROVED", "DRAFT"):
+        if status == "APPROVED" and ui.transition_allowed(transitions, user, "APPROVED", "DRAFT"):
             action_labels.append("reject")
-        if status == "APPROVED" and ui.transition_allowed(transitions, profile, "APPROVED", "PAID"):
+        if status == "APPROVED" and ui.transition_allowed(transitions, user, "APPROVED", "PAID"):
             action_labels.append("pay")
 
         if action_labels:
@@ -137,7 +137,7 @@ with st.container(border=True):
                 with action_cols[idx]:
                     if action == "recalculate" and st.button("Neu berechnen", use_container_width=True):
                         try:
-                            new_id = vat.create_statement(str(head["VAT_PERIOD"]), profile.username)
+                            new_id = vat.create_statement(str(head["VAT_PERIOD"]), user.username)
                             st.session_state["selected_statement_id"] = int(new_id)
                             st.session_state["flash_success"] = "Abrechnung wurde neu berechnet."
                             st.rerun()
@@ -146,7 +146,7 @@ with st.container(border=True):
 
                     if action == "approve" and st.button("Freigeben", type="primary", use_container_width=True):
                         try:
-                            vat.approve_statement(selected_id, profile.username)
+                            vat.approve_statement(selected_id, user.username)
                             st.session_state["flash_success"] = "Abrechnung wurde freigegeben."
                             st.rerun()
                         except Exception as exc:
@@ -154,7 +154,7 @@ with st.container(border=True):
 
                     if action == "reject" and st.button("Zurückweisen", use_container_width=True):
                         try:
-                            vat.reject_statement(selected_id, profile.username)
+                            vat.reject_statement(selected_id, user.username)
                             st.session_state["flash_success"] = "Abrechnung wurde zurückgewiesen."
                             st.rerun()
                         except Exception as exc:
@@ -162,7 +162,7 @@ with st.container(border=True):
 
                     if action == "pay" and st.button("Bezahlen", type="primary", use_container_width=True):
                         try:
-                            vat.pay_statement(selected_id, profile.username)
+                            vat.pay_statement(selected_id, user.username)
                             st.session_state["flash_success"] = "Abrechnung wurde bezahlt."
                             st.rerun()
                         except Exception as exc:

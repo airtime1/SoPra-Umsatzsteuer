@@ -6,11 +6,12 @@ import html
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from textwrap import dedent
-from typing import Any, Iterable
+from typing import Any
 
 import pandas as pd
 import streamlit as st
 
+from app.db import SESSION_PASSWORD_KEY, SESSION_USERNAME_KEY
 from app.services import vat
 
 
@@ -84,7 +85,7 @@ def apply_theme() -> None:
             display: none !important;
         }
 
-        .app-sidebar {
+        .st-key-app_nav {
             background: #fbfdff;
             border-right: 1px solid #dfe8f7;
             bottom: 0;
@@ -94,6 +95,10 @@ def apply_theme() -> None:
             top: 0;
             width: 132px;
             z-index: 999999;
+        }
+
+        .st-key-app_nav [data-testid="stVerticalBlock"] {
+            gap: 0.55rem;
         }
 
         .logo-tile {
@@ -111,46 +116,40 @@ def apply_theme() -> None:
             width: 46px;
         }
 
-        .sidebar-meta {
-            bottom: 1.4rem;
-            color: #5b6880;
-            font-size: 0.76rem;
-            left: 1.05rem;
-            position: absolute;
-        }
-
-        .sidebar-meta div {
-            margin-top: 1rem;
-        }
-
-        .nav-link {
+        .st-key-app_nav .stButton > button {
             align-items: center;
-            border-radius: 10px;
-            color: #52617a;
+            background: transparent !important;
+            border: 0 !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+            color: #52617a !important;
             display: flex;
-            flex-direction: column;
             font-size: 0.82rem;
-            font-weight: 650;
-            gap: 0.45rem;
+            font-weight: 650 !important;
             justify-content: center;
-            margin: 0.55rem 0;
-            min-height: 78px;
+            line-height: 1.18;
+            margin: 0.1rem 0;
+            min-height: 70px;
+            padding: 0.35rem 0.5rem;
             text-align: center;
-            text-decoration: none !important;
-            transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+            white-space: normal;
         }
 
-        .nav-link:hover,
-        .nav-link.active {
+        .st-key-app_nav .stButton > button[kind="primary"] {
+            background: #edf4ff !important;
+            box-shadow: inset 4px 0 0 var(--app-blue) !important;
+            color: var(--app-blue) !important;
+        }
+
+        .st-key-app_nav .stButton > button:hover {
             background: #edf4ff;
-            box-shadow: inset 4px 0 0 var(--app-blue);
-            color: var(--app-blue);
+            box-shadow: inset 4px 0 0 var(--app-blue) !important;
+            color: var(--app-blue) !important;
+            transform: none;
         }
 
-        .nav-link svg,
         .icon-badge svg,
         .date-chip svg,
-        .sidebar-meta svg,
         .inline-icon svg,
         .direction-icon svg {
             fill: none;
@@ -158,22 +157,6 @@ def apply_theme() -> None:
             stroke-linecap: round;
             stroke-linejoin: round;
             stroke-width: 2;
-        }
-
-        .nav-link svg {
-            height: 24px;
-            width: 24px;
-        }
-
-        .sidebar-meta .meta-row {
-            align-items: center;
-            display: flex;
-            gap: 0.45rem;
-        }
-
-        .sidebar-meta svg {
-            height: 18px;
-            width: 18px;
         }
 
         h1, h2, h3, p {
@@ -213,11 +196,29 @@ def apply_theme() -> None:
             width: 20px;
         }
 
-        .profile-caption {
+        .profile-box {
+            background: #ffffff;
+            border: 1px solid var(--app-border);
+            border-radius: 8px;
+            color: #17233d;
+            padding: 0.56rem 0.72rem;
+            text-align: right;
+        }
+
+        .profile-user {
+            font-size: 0.96rem;
+            font-weight: 720;
+        }
+
+        .profile-role {
             color: var(--app-muted);
             font-size: 0.78rem;
-            margin-top: -0.35rem;
-            text-align: right;
+            margin-top: 0.16rem;
+        }
+
+        .login-shell {
+            margin: 10vh auto 0;
+            max-width: 430px;
         }
 
         .breadcrumb {
@@ -433,29 +434,6 @@ def apply_theme() -> None:
             grid-template-columns: minmax(168px, 1.55fr) 1.05fr 0.95fr 0.9fr 0.9fr 0.9fr;
         }
 
-        .table-action-link {
-            align-items: center;
-            border: 1px solid #bfd5ff;
-            border-radius: 7px;
-            color: var(--app-blue) !important;
-            display: inline-flex;
-            font-size: 0.86rem;
-            font-weight: 720;
-            justify-content: center;
-            line-height: 1;
-            min-height: 2.05rem;
-            padding: 0 0.62rem;
-            text-decoration: none !important;
-            transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
-            white-space: nowrap;
-        }
-
-        .table-action-link:hover {
-            background: #edf4ff;
-            box-shadow: 0 6px 14px rgba(15, 98, 255, 0.13);
-            transform: translateY(-1px);
-        }
-
         .timeline {
             margin: 0.35rem 0 0.6rem 0.45rem;
             padding-left: 1.35rem;
@@ -613,18 +591,19 @@ def apply_theme() -> None:
             border-radius: 8px;
         }
 
-        div[role="dialog"]:has(.large-dialog) {
-            left: 50% !important;
+        .stDialog [role="dialog"] {
+            left: 50vw !important;
             margin: 0 !important;
             max-height: min(76vh, 720px) !important;
             max-width: min(1060px, calc(100vw - 4rem)) !important;
             overflow: auto !important;
-            top: max(72px, 12vh) !important;
+            position: fixed !important;
+            right: auto !important;
+            top: max(72px, 8vh) !important;
             transform: translateX(-50%) !important;
-            width: min(1060px, calc(100vw - 4rem)) !important;
         }
 
-        div[role="dialog"]:has(.large-dialog) [data-testid="stVerticalBlock"] {
+        .stDialog [role="dialog"] [data-testid="stVerticalBlock"] {
             gap: 0.65rem;
         }
 
@@ -632,7 +611,7 @@ def apply_theme() -> None:
             .block-container {
                 padding: 1.4rem 1rem 2rem 110px;
             }
-            .app-sidebar {
+            .st-key-app_nav {
                 width: 92px;
             }
             h1 {
@@ -660,30 +639,21 @@ def apply_theme() -> None:
 
 def render_sidebar(active: str) -> None:
     links = [
-        ("overview", "Übersicht", "/Übersicht", "home"),
-        ("new", "Neue Abrechnung", "/Neue_Abrechnung", "file-plus"),
-        ("select", "Abrechnung auswählen", "/Abrechnung_auswählen", "folder"),
+        ("overview", "Übersicht", "pages/1_Übersicht.py"),
+        ("new", "Neue Abrechnung", "pages/2_Neue_Abrechnung.py"),
+        ("select", "Abrechnung auswählen", "pages/3_Abrechnung_auswählen.py"),
     ]
-    nav_items = []
-    for key, label, href, icon in links:
-        active_class = " active" if key == active else ""
-        nav_items.append(
-            f'<a class="nav-link{active_class}" href="{href}" target="_self">'
-            f'{icon_svg(icon)}<span>{html.escape(label)}</span></a>'
-        )
-    st.markdown(
-        f"""
-        <nav class="app-sidebar">
-            <div class="logo-tile">%</div>
-            {''.join(nav_items)}
-            <div class="sidebar-meta">
-                <div class="meta-row">{icon_svg("clock")}<span>Hilfe</span></div>
-                <div class="meta-row">{icon_svg("log-out")}<span>Ausloggen</span></div>
-            </div>
-        </nav>
-        """,
-        unsafe_allow_html=True,
-    )
+
+    with st.container(key="app_nav"):
+        st.markdown('<div class="logo-tile">%</div>', unsafe_allow_html=True)
+        for key, label, page in links:
+            if st.button(
+                label,
+                key=f"nav-{key}",
+                type="primary" if key == active else "secondary",
+                use_container_width=True,
+            ) and key != active:
+                st.switch_page(page)
 
 
 def icon_svg(name: str, size: int | None = None) -> str:
@@ -701,13 +671,70 @@ def current_date_label(today: date | None = None) -> str:
     return (today or date.today()).strftime("%d.%m.%Y")
 
 
-def render_header(title: str, profiles: Iterable[vat.Fachkraft]) -> vat.Fachkraft:
-    profiles = list(profiles)
-    labels = [profile.label for profile in profiles]
-    current = st.session_state.get("fachkraft_label", labels[0] if labels else "Fachkraft 1")
-    index = labels.index(current) if current in labels else 0
+def _session_user() -> vat.AuthenticatedUser | None:
+    data = st.session_state.get("authenticated_user")
+    if not isinstance(data, dict):
+        return None
+    if not st.session_state.get(SESSION_USERNAME_KEY) or not st.session_state.get(SESSION_PASSWORD_KEY):
+        return None
+    try:
+        return vat.AuthenticatedUser(
+            username=str(data["username"]),
+            level=int(data["level"]),
+            role=str(data["role"]),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
 
-    left, center, right = st.columns([5.4, 1.8, 2.2], vertical_alignment="center")
+
+def clear_login() -> None:
+    for key in (
+        "authenticated_user",
+        SESSION_USERNAME_KEY,
+        SESSION_PASSWORD_KEY,
+        "selected_statement_id",
+        "flash_success",
+    ):
+        st.session_state.pop(key, None)
+
+
+def require_login() -> vat.AuthenticatedUser:
+    user = _session_user()
+    if user is not None:
+        return user
+
+    render_login()
+    st.stop()
+
+
+def render_login() -> None:
+    st.markdown('<div class="login-shell">', unsafe_allow_html=True)
+    st.markdown("<h1>Umsatzsteuerabrechnung</h1>", unsafe_allow_html=True)
+    with st.container(border=True):
+        with st.form("db-login"):
+            username = st.text_input("DB-Benutzer")
+            password = st.text_input("Passwort", type="password")
+            submitted = st.form_submit_button("Anmelden", type="primary", use_container_width=True)
+
+        if submitted:
+            try:
+                user = vat.authenticate_user(username, password)
+            except Exception as exc:
+                st.error(friendly_error_message(exc))
+            else:
+                st.session_state[SESSION_USERNAME_KEY] = username.strip()
+                st.session_state[SESSION_PASSWORD_KEY] = password
+                st.session_state["authenticated_user"] = {
+                    "username": user.username,
+                    "level": user.level,
+                    "role": user.role,
+                }
+                st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_header(title: str, user: vat.AuthenticatedUser) -> vat.AuthenticatedUser:
+    left, center, right = st.columns([5.2, 1.7, 2.4], vertical_alignment="center")
     with left:
         st.markdown(f"<h1>{html.escape(title)}</h1>", unsafe_allow_html=True)
     with center:
@@ -716,23 +743,20 @@ def render_header(title: str, profiles: Iterable[vat.Fachkraft]) -> vat.Fachkraf
             unsafe_allow_html=True,
         )
     with right:
-        selected = st.selectbox(
-            "Fachkraft",
-            labels,
-            index=index,
-            label_visibility="collapsed",
-            key="fachkraft_label",
+        st.markdown(
+            f"""
+            <div class="profile-box">
+                <div class="profile-user">{html.escape(user.username)}</div>
+                <div class="profile-role">{html.escape(user.role)} · Level {int(user.level)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
+        if st.button("Abmelden", key=f"logout-{title}", use_container_width=True):
+            clear_login()
+            st.rerun()
 
-    profile = next((item for item in profiles if item.label == selected), profiles[0])
-    st.session_state["fachkraft_level"] = profile.level
-    st.session_state["fachkraft_username"] = profile.username
-    st.session_state["fachkraft_role"] = profile.role
-    st.markdown(
-        f'<div class="profile-caption">{html.escape(profile.role)} · {html.escape(profile.username)}</div>',
-        unsafe_allow_html=True,
-    )
-    return profile
+    return user
 
 
 def render_breadcrumb(parts: list[str]) -> None:
@@ -830,10 +854,6 @@ def period_current() -> str:
     return f"{today.year:04d}-{today.month:02d}"
 
 
-def statement_href(statement_id: Any) -> str:
-    return f"/Abrechnung_auswählen?statement_id={format_id(statement_id)}"
-
-
 def empty_statement_row() -> dict[str, Any]:
     return {
         "VAT_STATEMENT_ID": None,
@@ -860,18 +880,32 @@ def sortable_statements(df: pd.DataFrame) -> pd.DataFrame:
     return sorted_df.sort_values(["VAT_PERIOD", "_STATUS_ORDER", "VAT_STATEMENT_ID"], ascending=[False, True, False])
 
 
-def transition_allowed(transitions: pd.DataFrame, profile: vat.Fachkraft, old_status: str, new_status: str) -> bool:
+def has_security_level(user: vat.AuthenticatedUser, required_level: int) -> bool:
+    return int(user.level) >= int(required_level)
+
+
+def transition_allowed(
+    transitions: pd.DataFrame,
+    user: vat.AuthenticatedUser,
+    old_status: str,
+    new_status: str,
+) -> bool:
     if transitions.empty:
         return False
     matches = transitions[
         (transitions["OLD_STATUS"].astype(str) == old_status)
         & (transitions["NEW_STATUS"].astype(str) == new_status)
-        & (transitions["SECURITY_LEVEL"].astype(int) == int(profile.level))
     ]
-    return not matches.empty
+    if matches.empty:
+        return False
+    return bool((matches["SECURITY_LEVEL"].astype(int) <= int(user.level)).any())
 
 
-def can_edit_statement(row: pd.Series | dict[str, Any] | None, profile: vat.Fachkraft, transitions: pd.DataFrame) -> bool:
+def can_edit_statement(
+    row: pd.Series | dict[str, Any] | None,
+    user: vat.AuthenticatedUser,
+    transitions: pd.DataFrame,
+) -> bool:
     if row is None:
         return False
     statement_id = row.get("VAT_STATEMENT_ID")
@@ -879,10 +913,10 @@ def can_edit_statement(row: pd.Series | dict[str, Any] | None, profile: vat.Fach
         return False
     status = str(row.get("VAT_STATUS") or "")
     if status == "DRAFT":
-        return profile.level == 1 or transition_allowed(transitions, profile, "DRAFT", "APPROVED")
+        return has_security_level(user, 1) or transition_allowed(transitions, user, "DRAFT", "APPROVED")
     if status == "APPROVED":
-        return transition_allowed(transitions, profile, "APPROVED", "DRAFT") or transition_allowed(
-            transitions, profile, "APPROVED", "PAID"
+        return transition_allowed(transitions, user, "APPROVED", "DRAFT") or transition_allowed(
+            transitions, user, "APPROVED", "PAID"
         )
     return False
 
@@ -1032,8 +1066,12 @@ def friendly_error_message(exc: Exception) -> str:
         return "Diese Periode ist nicht abrechenbar oder das Periodenformat ist ungültig."
     if "50002" in raw or "freigegeben" in lower or "abgeschlossen" in lower:
         return "Diese Abrechnung ist bereits freigegeben oder abgeschlossen."
-    if "50010" in raw or "security" in lower or "berecht" in lower or "securitylevel" in lower:
-        return "Die ausgewählte Fachkraft hat für diese Aktion nicht die benötigte Berechtigung."
+    if "50010" in raw:
+        return "Diese Abrechnung ist nicht im passenden Status für die Aktion."
+    if "50020" in raw or "50021" in raw or "security" in lower or "berecht" in lower or "rolle" in lower or "securitylevel" in lower:
+        return "Der eingeloggte Benutzer hat für diese Aktion nicht die benötigte Berechtigung."
+    if "50024" in raw or "benutzerparameter" in lower:
+        return "Der Audit-User stimmt nicht mit dem eingeloggten DB-User überein."
     if "login" in lower or "password" in lower or "credential" in lower:
         return "Die APP-Datenbankverbindung konnte nicht hergestellt werden."
     return raw
@@ -1051,7 +1089,7 @@ def show_error_dialog(title: str, exc: Exception) -> None:
     message_dialog(title, friendly_error_message(exc))
 
 
-@st.dialog("Alle Drafts")
+@st.dialog("Alle Drafts", width="large")
 def drafts_dialog(drafts: pd.DataFrame) -> None:
     if drafts.empty:
         st.info("Keine offenen Drafts vorhanden.")
@@ -1074,15 +1112,13 @@ def existing_statement_dialog(statement_id: int, period: str) -> None:
         st.switch_page("pages/3_Abrechnung_auswählen.py")
 
 
-@st.dialog("Alle Positionen")
+@st.dialog("Alle Positionen", width="large")
 def positions_dialog(items: pd.DataFrame) -> None:
-    st.markdown('<div class="large-dialog"></div>', unsafe_allow_html=True)
     render_item_rows(items, limit=None)
 
 
-@st.dialog("Gesamter Verlauf")
+@st.dialog("Gesamter Verlauf", width="large")
 def timeline_dialog(entries: list[dict[str, str]]) -> None:
-    st.markdown('<div class="large-dialog"></div>', unsafe_allow_html=True)
     render_timeline(entries)
 
 
@@ -1128,38 +1164,26 @@ def render_statement_header_table(row: dict[str, Any] | pd.Series, action: bool 
 
 def render_draft_rows(drafts: pd.DataFrame, key_prefix: str, limit: int = 2) -> None:
     shown = drafts.head(limit)
-    rows = [
-        dedent(
-            """
-        <div class="mock-table">
-            <div class="table-head draft-grid">
-                <span></span><span>ID</span><span>Periode</span><span>Status</span><span></span>
-            </div>
-        """
-        ).strip()
-    ]
     if shown.empty:
-        rows.append("</div>")
-        st.markdown("".join(rows), unsafe_allow_html=True)
         st.markdown('<div class="hint-line">Keine offenen Drafts vorhanden.</div>', unsafe_allow_html=True)
         return
 
+    header_cols = st.columns([0.34, 0.75, 1, 0.85, 0.75], vertical_alignment="center")
+    header_cols[0].markdown("")
+    header_cols[1].markdown("**ID**")
+    header_cols[2].markdown("**Periode**")
+    header_cols[3].markdown("**Status**")
+    header_cols[4].markdown("")
+
     for _, row in shown.iterrows():
-        rows.append(
-            dedent(
-                f"""
-            <div class="table-row draft-grid">
-                <span class="inline-icon">{icon_svg("document")}</span>
-                <span>{html.escape(format_id(row["VAT_STATEMENT_ID"]))}</span>
-                <span>{html.escape(str(row["VAT_PERIOD"]))}</span>
-                <span>{status_badge(row["VAT_STATUS"])}</span>
-                <span><a class="table-action-link" href="{html.escape(statement_href(row["VAT_STATEMENT_ID"]))}" target="_self">Öffnen</a></span>
-            </div>
-            """
-            ).strip()
-        )
-    rows.append("</div>")
-    st.markdown("".join(rows), unsafe_allow_html=True)
+        cols = st.columns([0.34, 0.75, 1, 0.85, 0.75], vertical_alignment="center")
+        cols[0].markdown(f'<span class="inline-icon">{icon_svg("document")}</span>', unsafe_allow_html=True)
+        cols[1].write(format_id(row["VAT_STATEMENT_ID"]))
+        cols[2].write(str(row["VAT_PERIOD"]))
+        cols[3].markdown(status_badge(row["VAT_STATUS"]), unsafe_allow_html=True)
+        if cols[4].button("Öffnen", key=f"{key_prefix}-{row['VAT_STATEMENT_ID']}"):
+            st.session_state["selected_statement_id"] = int(row["VAT_STATEMENT_ID"])
+            st.switch_page("pages/3_Abrechnung_auswählen.py")
 
 
 def render_compact_statement_rows(statements: pd.DataFrame, key_prefix: str, limit: int | None = None) -> None:
@@ -1184,43 +1208,38 @@ def render_compact_statement_rows(statements: pd.DataFrame, key_prefix: str, lim
 
 
 def render_all_statement_rows(statements: pd.DataFrame, key_prefix: str) -> None:
-    rows = [
-        dedent(
-            """
-        <div class="mock-table">
-            <div class="table-head statement-grid">
-                <span>ID</span><span>Periode</span><span>Status</span><span>Umsatzsteuer</span>
-                <span>Vorsteuer</span><span>Saldo</span><span>Type</span><span>Erstellt am</span><span>Aktion</span>
-            </div>
-        """
-        ).strip()
-    ]
     if statements.empty:
-        rows.append("</div>")
-        st.markdown("".join(rows), unsafe_allow_html=True)
         st.markdown('<div class="hint-line">Keine Umsatzsteuerabrechnungen vorhanden.</div>', unsafe_allow_html=True)
         return
+
+    header_cols = st.columns([0.65, 0.9, 1, 1.15, 1.1, 0.9, 0.9, 0.95, 0.85], vertical_alignment="center")
+    for col, label in zip(
+        header_cols,
+        ["ID", "Periode", "Status", "Umsatzsteuer", "Vorsteuer", "Saldo", "Type", "Erstellt am", "Aktion"],
+        strict=True,
+    ):
+        col.markdown(f"**{label}**")
+
     for _, row in statements.iterrows():
         value_tone = value_class(row["VAT_TYPE"])
-        rows.append(
-            dedent(
-                f"""
-            <div class="table-row statement-grid">
-                <span>{html.escape(format_id(row["VAT_STATEMENT_ID"]))}</span>
-                <span>{html.escape(str(row["VAT_PERIOD"]))}</span>
-                <span>{status_badge(row["VAT_STATUS"])}</span>
-                <span>{html.escape(format_currency(row["OUTPUT_VAT_TOTAL"]))}</span>
-                <span>{html.escape(format_currency(row["INPUT_VAT_TOTAL"]))}</span>
-                <span class="{html.escape(value_tone)}">{html.escape(format_currency(row["VAT_BALANCE"]))}</span>
-                <span class="{html.escape(value_tone)}">{html.escape(type_label(row["VAT_TYPE"]))}</span>
-                <span>{html.escape(format_date(row.get("CREATED_AT")))}</span>
-                <span><a class="table-action-link" href="{html.escape(statement_href(row["VAT_STATEMENT_ID"]))}" target="_self">Öffnen</a></span>
-            </div>
-            """
-            ).strip()
+        cols = st.columns([0.65, 0.9, 1, 1.15, 1.1, 0.9, 0.9, 0.95, 0.85], vertical_alignment="center")
+        cols[0].write(format_id(row["VAT_STATEMENT_ID"]))
+        cols[1].write(str(row["VAT_PERIOD"]))
+        cols[2].markdown(status_badge(row["VAT_STATUS"]), unsafe_allow_html=True)
+        cols[3].write(format_currency(row["OUTPUT_VAT_TOTAL"]))
+        cols[4].write(format_currency(row["INPUT_VAT_TOTAL"]))
+        cols[5].markdown(
+            f'<span class="{html.escape(value_tone)}">{html.escape(format_currency(row["VAT_BALANCE"]))}</span>',
+            unsafe_allow_html=True,
         )
-    rows.append("</div>")
-    st.markdown("".join(rows), unsafe_allow_html=True)
+        cols[6].markdown(
+            f'<span class="{html.escape(value_tone)}">{html.escape(type_label(row["VAT_TYPE"]))}</span>',
+            unsafe_allow_html=True,
+        )
+        cols[7].write(format_date(row.get("CREATED_AT")))
+        if cols[8].button("Öffnen", key=f"{key_prefix}-{row['VAT_STATEMENT_ID']}"):
+            st.session_state["selected_statement_id"] = int(row["VAT_STATEMENT_ID"])
+            st.switch_page("pages/3_Abrechnung_auswählen.py")
 
 
 def render_item_rows(items: pd.DataFrame, limit: int | None = 4) -> None:

@@ -50,3 +50,4 @@ Quelle: historische MS4-Tabelle „Tests SF_CAL_VAT" + ADR-004 (Konvention Absol
 | TC-STAT-03 | APPROVED → PAID durch Leitung FiBu | BESTANDEN (`sp_status_workflow_roles_demo.sql`) |
 | TC-STAT-04 | APPROVED → DRAFT (Rückgabe) durch CFO | OFFEN |
 | TC-STAT-05 | PAID → ? wird abgelehnt | BESTANDEN für Neuberechnung einer PAID-Periode (`sp_status_workflow_roles_demo.sql`) |
+| TC-STAT-06 | Höhere Rollen dürfen niedrigere Aktionen ausführen | BESTANDEN (`sp_status_workflow_roles_demo.sql`) |

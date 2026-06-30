@@ -222,7 +222,7 @@ G9 (Rosenberg) und G10 (Freiburg) brauchen keinen eigenen Block mehr, weil sie �
 
 **`sp_G15_create_vat_statement(@vat_period, @created_by)`** — der Hauptablauf:
 1. `fn_G15_check_vat_period` prüfen → ggf. Fehler werfen.
-2. Rolle prüfen (`@creator_security_level <> 1` → nur Sachbearbeiter legt an).
+2. Audit-User gegen `SUSER_SNAME()` prüfen und Rolle prüfen (`@creator_security_level < 1` → alle User ab Sachbearbeiter-Level dürfen anlegen).
 3. Vorhandenen DRAFT zurücksetzen oder neuen Kopf anlegen (`SCOPE_IDENTITY()` holt die neue ID).
 4. Items **erfassen**: alle Zeilen aus `V_LIST_G15_OUTPUT_VAT` und `V_LIST_G15_INPUT_VAT`, **gefiltert auf den Periodenmonat** über `SOURCE_INVOICE_DATE BETWEEN @period_start AND @period_end`.
 5. Skonto **überschreiben** (ADR-010): per `UPDATE … JOIN V_LIST_G15_VAT_SKONTO` bekommt jede Rechnung mit `IS_SKONTO='Y'` den finalen Steuerbetrag (Match über `INVOICE_ID`), `IS_CORRECTION=1`, `ORIGINAL_INVOICE_ID=SOURCE_INVOICE_ID`. Periodensicher durch die 7-Tage-Skontofrist + 10.-des-Folgemonats-Regel.
@@ -232,7 +232,7 @@ G9 (Rosenberg) und G10 (Freiburg) brauchen keinen eigenen Block mehr, weil sie �
 **`sp_approve` / `sp_pay` / `sp_reject`** — Statuswechsel, gleiche Bauweise:
 1. Status-IDs per Name aus `T_CODE` holen.
 2. **Übergang prüfen** über die zentrale Architekten-Funktion `dbo.fn_chk_status_folge(@old_id, @new_id)` (ADR-009) — die liest `T_CODE_NEXT` und gibt `'OK'` oder einen Fehlertext zurück.
-3. **Rolle prüfen**: `SECURITY_LEVEL` der Transition aus `T_CODE_NEXT` holen, gegen `dbo.fn_get_user_securitylevel` abgleichen.
+3. **Audit/User prüfen**: Übergebener User muss `SUSER_SNAME()` entsprechen; danach `SECURITY_LEVEL` der Transition aus `T_CODE_NEXT` holen und gegen `dbo.fn_get_user_securitylevel` hierarchisch abgleichen (`actual >= required`).
 4. Prüfen, ob die Abrechnung im passenden Ausgangsstatus ist, dann `UPDATE` + Audit-Felder setzen, in Transaktion.
 
 **Wichtig (Abhängigkeit):** `dbo.fn_chk_status_folge` existiert in ERPDEV26S, aber **nicht** in der lokalen Sandbox. Der Status-Workflow ist daher nur gegen ERPDEV vollständig testbar.

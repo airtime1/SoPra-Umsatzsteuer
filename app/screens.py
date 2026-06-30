@@ -12,17 +12,17 @@ from app.services import vat
 
 def render_overview() -> None:
     ui.apply_theme()
+    user = ui.require_login()
     ui.render_sidebar("overview")
 
     try:
-        profiles = vat.list_fachkraefte()
         statements = vat.list_statements()
         transitions = vat.list_status_transitions()
     except Exception as exc:
         ui.show_error_dialog("DB-Zugriff fehlgeschlagen", exc)
         st.stop()
 
-    profile = ui.render_header("Umsatzsteuerabrechnung", profiles)
+    user = ui.render_header("Umsatzsteuerabrechnung", user)
 
     current_period = vat.latest_billable_period()
     current_statement = None
@@ -52,7 +52,7 @@ def render_overview() -> None:
                 unsafe_allow_html=True,
             )
         with title_cols[1]:
-            if ui.can_edit_statement(current_statement, profile, transitions):
+            if ui.can_edit_statement(current_statement, user, transitions):
                 if st.button("Bearbeiten", type="primary", use_container_width=True):
                     st.session_state["selected_statement_id"] = int(current_row["VAT_STATEMENT_ID"])
                     st.switch_page("pages/3_Abrechnung_auswählen.py")
@@ -98,7 +98,7 @@ def render_overview() -> None:
         with header_cols[0]:
             ui.card_title("Alle Umsatzsteuerabrechnungen", "document")
         with header_cols[1]:
-            if profile.level == 1:
+            if ui.has_security_level(user, 1):
                 if st.button("Hinzufügen", type="primary", use_container_width=True):
                     st.switch_page("pages/2_Neue_Abrechnung.py")
         ui.render_all_statement_rows(ui.sortable_statements(statements), key_prefix="overview-all")

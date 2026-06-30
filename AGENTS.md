@@ -66,8 +66,8 @@ Arbeitsdokumentation beschreibt immer den aktuellen Soll-Zustand. Veraltete Auss
 - Datenbank: MS SQL Server auf `edu.hdm-server.eu`.
 - Gemeinsame Entwicklungsdatenbank: `ERPDEV26S`.
 - Eigene Sandbox: persoenliche Datenbank nach Muster `s26s5xx_DATAMART`.
-- Frontend: Python 3.11+, Streamlit, pyodbc, python-dotenv, pandas.
-- Die finale Streamlit-App nutzt den vorgesehenen APP-Zugang direkt (`get_app_conn()`), nicht die Sandbox. `APP_DB_PROFILE`/`get_active_conn()` existiert noch fuer Legacy-/Hilfszwecke, ist aber nicht mehr die Laufzeitquelle der UI.
+- Frontend: Python 3.11+, Streamlit, pymssql fuer UI-DB-Verbindungen, pyodbc fuer Deploy-/Analyse-Skripte, python-dotenv, pandas.
+- Die finale Streamlit-App nutzt beim Start echte DB-Credentials des Benutzers (`get_user_conn()`/`get_authenticated_conn()`), nicht mehr einen gemeinsamen APP-Laufzeituser und nicht die Sandbox.
 - Tests: SQL-Testskripte gegen Sandbox; pytest ist als geplanter Wrapper in `requirements.txt`, eine Python-Test-Suite ist noch nicht angelegt.
 - Repo-Workflow: GitHub Team-Repo mit Feature-Branches, Pull Requests, mindestens einem Review und Squash-Merge.
 
@@ -87,7 +87,7 @@ Wichtige eigene Objekte:
 | `list_views.V_LIST_G15_INPUT_VAT` | Vorsteuer aus G4 (Lieferantenrechnungen); aktiv auf `V_LIST_SUPPLIER_INVOICE`, konsumiert `TOTAL_VAT_AMOUNT` als `TAX_AMOUNT`, keine Eigenberechnung (ADR-008); 0 Zeilen bis G4 Daten einspielt |
 | `list_views.V_LIST_G15_VAT_STATEMENT` | Anzeige-View fuer Abrechnungskopf |
 | `list_views.V_LIST_G15_VAT_STATEMENT_ITEM` | Anzeige-View fuer Abrechnungspositionen |
-| `list_views.V_LIST_G15_VAT_USER` | Minimale User-/Rollen-View ohne Passwortdaten; **nicht** in ERPDEV26S deployed (nur lokal/Sandbox, Klaerung offen) |
+| `list_views.V_LIST_G15_VAT_USER` | Minimale User-/Rollen-View ohne Passwortdaten; **nicht** in ERPDEV26S deployed (nur lokal/Sandbox, Klaerung offen); die App nutzt fuer den Login stattdessen direkt `dbo.fn_get_user_securitylevel(SUSER_SNAME())` |
 | `stored_func.fn_G15_check_vat_period` | Prueft Periodenformat, 10.-des-Folgemonats-Regel und Sperrstatus |
 | `stored_func.fn_G15_calculate_vat_balance` | Berechnet `VAT_BALANCE` als Absolutbetrag und `VAT_TYPE` |
 | `dbo.fn_get_user_securitylevel` | Zentrale Architekten-Funktion (liest `dbo.T_USER.SECURITYLEVEL`) fuer Rollenpruefungen; G15 bindet sie ein, eigene Funktion entfernt (Coaching-Feedback) |
@@ -107,7 +107,7 @@ Verbindliche DB-Regeln:
 - `VAT_BALANCE` ist immer ein nicht-negativer Absolutbetrag; `VAT_TYPE` unterscheidet `ZAHLLAST`, `UEBERHANG`, `NEUTRAL`.
 - Abgeschlossene oder freigegebene Abrechnungen duerfen nicht neu berechnet werden; nur `DRAFT` darf durch `sp_G15_create_vat_statement` ersetzt werden.
 - Eine Periode darf nur einmal existieren (`VAT_PERIOD` eindeutig). Bestehende Sandbox-/DEV-Instanzen werden ueber idempotente Constraint-Skripte nachgezogen.
-- Status-Procedures pruefen Rollen ueber `T_CODE_NEXT.SECURITY_LEVEL` und `T_USER.SECURITYLEVEL`: Sachbearbeiter `1`, Leitung FiBu `2`, CFO `3`.
+- Status-Procedures pruefen Rollen hierarchisch ueber `T_CODE_NEXT.SECURITY_LEVEL` und `T_USER.SECURITYLEVEL`: Level 1 sieht/darf Level-1-Aktionen, Level 2 zusaetzlich Level 2, Level 3 zusaetzlich Level 3. Uebergebene Audit-User muessen dem aktuellen `SUSER_SNAME()` entsprechen.
 
 ## App-Flow
 
@@ -116,20 +116,20 @@ Streamlit findet die Seiten automatisch unter `app/pages/`.
 1. `app/main.py` initialisiert die App und erklaert die Navigation.
 2. `app/pages/1_Übersicht.py` zeigt bestehende Abrechnungen mit Statusfilter und Kennzahlen.
 3. `app/pages/2_Neue_Abrechnung.py` legt eine Periode ueber `stored_proc.sp_G15_create_vat_statement` an oder berechnet einen `DRAFT` neu. Der Default ist die letzte nach 10.-des-Folgemonats-Regel abrechenbare Periode.
-4. `app/pages/3_Detail.py` zeigt Kopf und Items, Audit-Spuren und ruft die Status-Procedures mit passenden Demo-Rollen auf.
-5. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe, liest aus Anzeige-Views und nutzt `get_active_conn()`.
-6. `app/db.py` liest `.env`, stellt App-, Dev- und Sandbox-Verbindungen bereit und waehlt die aktive App-Verbindung ueber `APP_DB_PROFILE`.
+4. `app/pages/3_Abrechnung_auswählen.py` zeigt Kopf und Items, Audit-Spuren und ruft die Status-Procedures mit dem eingeloggten DB-User auf.
+5. `app/services/vat.py` ist die duenne Service-Schicht fuer Datenbankaufrufe, authentifiziert den Login ueber `dbo.fn_get_user_securitylevel(SUSER_SNAME())`, liest aus Anzeige-Views und ruft Stored Procedures mit dem echten DB-User auf.
+6. `app/db.py` liest `.env`, stellt User-, Dev- und Sandbox-Verbindungen bereit; die UI nutzt `get_authenticated_conn()` mit den Session-Credentials des eingeloggten DB-Users.
 
-Die Sandbox ist fuer die finale UI nicht mehr Laufzeitbasis. Lokale UI-Pruefung erfolgt gegen den vorgesehenen APP-Zugang auf `ERPDEV26S`.
+Die Sandbox ist fuer die finale UI nicht mehr Laufzeitbasis. Lokale UI-Pruefung erfolgt gegen `ERPDEV26S` mit echten DB-Credentials.
 
-Die UI enthaelt weiterhin keine echte Authentifizierung. Sie bietet aber Demo-User je Rolle aus `list_views.V_LIST_G15_VAT_USER` an; die verbindliche Rollenpruefung liegt in den Stored Procedures.
+Die UI enthaelt keine manuelle Rollensimulation mehr. Der Benutzer meldet sich mit seinem DB-Zugang an; User und Security-Level kommen aus der DB, und die verbindliche hierarchische Rollenpruefung liegt weiterhin in den Stored Procedures.
 
 ## Deployment und Sandbox
 
 - `scripts/deploy_sandbox.py` fuehrt die Ordner aus `sql/` in definierter Reihenfolge gegen die eigene Sandbox aus: `00_setup`, `01_tables`, `02_views`, `03_stored_func`, `04_stored_proc`, `05_ins_upd_views`, `99_seed`.
 - `scripts/deploy_dev.py` deployt nur Objekte in erlaubten Schemata gegen `ERPDEV26S`: `02_views`, `03_stored_func`, `04_stored_proc`, `05_ins_upd_views`.
 - `deploy_dev.py` fragt interaktiv nach Bestaetigung. Nicht automatisiert oder ohne ausdrueckliche Freigabe gegen die gemeinsame Dev-DB deployen.
-- `.env.example` ist nur ein Template und enthaelt `APP_DB_PROFILE=app` als Default. `.env` und echte Credentials niemals committen, anzeigen oder in Logs ausgeben.
+- `.env.example` ist nur ein Template fuer Zielsysteme. Die UI-Passwoerter werden nicht dort hinterlegt, sondern im Login eingegeben. `.env` und echte Credentials niemals committen, anzeigen oder in Logs ausgeben.
 
 ## Tests und Abnahme
 
@@ -149,7 +149,7 @@ Die ADRs in `docs/entscheidungen/` dokumentieren den aktuellen Entscheidungsstan
 | ADR | Entscheidung |
 |---|---|
 | 001 | Statusmodell `DRAFT` -> `APPROVED` -> `PAID`, Rueckgabe `APPROVED` -> `DRAFT` |
-| 002 | Rollen: Sachbearbeiter legt an, CFO gibt frei, Leitung FiBu zahlt aus |
+| 002 | Rollen-Reihenfolge und Level: Sachbearbeitung, Leitung FiBu, CFO; ergaenzt durch hierarchische Rechte in ADR-011 |
 | 003 | Fachliche Namen: `VAT_STATUS`, `SOURCE_INVOICE_DATE` |
 | 004 | Saldo als Absolutbetrag plus `VAT_TYPE` |
 | 005 | ~~Korrekturen als eigene Item-Zeilen~~ — abgeloest durch ADR-010 |
@@ -158,6 +158,7 @@ Die ADRs in `docs/entscheidungen/` dokumentieren den aktuellen Entscheidungsstan
 | 008 | Keine eigene Steuerberechnung; Partner-Lese-Views konsumieren; Stub-Pattern fuer fehlende Quellen |
 | 009 | Status-Procedures nutzen zentrale `dbo.fn_chk_status_folge` fuer Uebergangspruefung |
 | 010 | Skonto-Korrektur ueberschreibt finalen Steuerbetrag der Rechnung (loest ADR-005 ab); G8 liefert Endbetrag + `IS_SKONTO` |
+| 011 | DB-Login mit echtem User und hierarchische Rollenlogik (`actual_level >= required_level`) |
 
 Aus der Git-Historie dauerhaft relevant:
 - PR #17 bereinigte alte Grossschreibungs-Referenzen auf Function-/Procedure-Namen. Neue Doku darf nicht mehr `SF_*`/`SP_*` als aktuelle Objektnamen verwenden, ausser beim historischen MS4-Mapping.
@@ -171,9 +172,9 @@ Aus der Git-Historie dauerhaft relevant:
 - Partner-/Deploy-Stand 2026-06-27 gegen ERPDEV26S: Alle G15-Objekte sind deployt und konsistent benannt (`V_LIST_G15_*`, `fn_G15_*`, `sp_G15_*`; Security ueber `dbo.fn_get_user_securitylevel`); der zwischenzeitliche unvollstaendige Coaching-Rename (kaputte Referenzen) ist per Redeploy behoben. Die dbo-Tabellen `T_VAT_STATEMENT`/`_ITEM` existieren jetzt (vom Architekten angelegt). G7 (`V_LIST_G07_INVOICE`) aktiv, aber deutsche Spaltennamen (Mapping in unserer View) und **nur Fernabsatz** (INNER JOINs Angebot->Auftrag->Lieferung); B2C-Barverkaeufe (G9/G10) fehlen noch. G4 (`V_LIST_SUPPLIER_INVOICE`, `TOTAL_VAT_AMOUNT`) ist angebunden (`V_LIST_G15_INPUT_VAT` aktiv), hat aber noch 0 Datenzeilen. Skonto: G8 hat zwar das Skonto-Flag `SKONTO_BERECHTIGT_YN` (in `V_LIST_G08_PAYMENT_RECEIPT`), aber weiterhin **keinen finalen Steuerbetrag nach Skonto** — und genau den braucht der Ueberschreib-Schritt (ADR-010). Die separate `V_LIST_G08_VAT_CORRECTION` enthaelt nur Ueberzahlungs-Korrekturen als Delta (`Korrekturart='Ueberzahlung'`) und ist dafuer nicht geeignet. Daher bleibt `V_LIST_G15_VAT_SKONTO` Stub; der vorbereitete SELECT (echte Spalten `INVOICE_ID`/`SKONTO_BERECHTIGT_YN`/`STORNO_YN`, Platzhalter fuer den Endbetrag) wird eingesetzt, sobald G8 liefert. Liefert G8 nicht rechtzeitig, laufen Skonto-Betraege bewusst nicht ein (keine Eigenberechnung, ADR-008) — das ist G8s Bring-Schuld (Issue #26). Bring-Schulden als Issues #24-#28 dokumentiert.
 - Status-Workflow haengt zur Laufzeit an `dbo.fn_chk_status_folge` (in ERPDEV vorhanden, in der lokalen Sandbox nicht). Vollstaendiger Workflow-Test nur gegen ERPDEV26S.
 - APP-Schreibtest 2026-06-27: Die live vorhandenen G15-Procedures in ERPDEV26S wurden auf `dbo.fn_get_user_securitylevel` sowie die vorhandenen `list_views.V_LIST_G15_*`-/`stored_func.fn_G15_*`-Objekte korrigiert. Anlage, Freigabe, Rueckweisung und Bezahlung liefen ueber den APP-Zugang in einer Rollback-Transaktion erfolgreich.
-- APP-Rechte nach DEV-DB-Kopie 2026-06-27: `ERP_REMOTE_USER` benoetigt `EXECUTE` auf `stored_func.fn_G15_check_vat_period` und die vier `stored_proc.sp_G15_*`-Procedures sowie `SELECT` auf `stored_func.fn_G15_calculate_vat_balance` (table-valued Function). Diese Grants wurden nachgezogen.
+- APP-Rechte nach DEV-DB-Kopie 2026-06-27: `ERP_REMOTE_USER`-Grants wurden fuer den alten APP-User-Prototyp nachgezogen. Seit 2026-06-29 laeuft die UI mit echten DB-Logins; diese User brauchen Lesezugriff auf die G15-Views, `EXECUTE` auf `stored_func.fn_G15_check_vat_period` und die vier `stored_proc.sp_G15_*`-Procedures sowie `SELECT` auf `stored_func.fn_G15_calculate_vat_balance`.
 - Append-only Verlauf ist DB-seitig noch offen: Es gibt keine VAT-spezifische Historientabelle und G15 hat kein `CREATE TABLE`-/`dbo ALTER`-Recht. Die UI liest defensiv `list_views.V_LIST_G15_VAT_STATEMENT_HISTORY` bzw. `dbo.T_G15_VAT_STATEMENT_HISTORY`, falls der Architekt die saubere Historie anlegt; bis dahin bleiben nur aktuelle Audit-Spalten als Fallback.
-- Rollenpruefungen in den Status-Procedures sind technisch umgesetzt, ersetzen aber keine echte Authentifizierung im Streamlit-Prototyp.
+- Streamlit speichert die eingegebenen DB-Credentials nur im laufenden Session-State, um pro Rerun neue DB-Verbindungen aufzubauen. Keine Passwoerter committen oder loggen.
 - `ins_views`/`upd_views` sind als Ordner vorgesehen, aber aktuell nicht implementiert und moeglicherweise durch Stored Procedures ersetzbar.
 - Eine automatisierte pytest-Suite fehlt noch.
 - Finale Frontend-Entscheidung Python/Streamlit vs. phpRunner bleibt offen; deshalb Frontend duenn halten.

@@ -15,7 +15,7 @@ Konzern-ERP-Modul für die monatliche Umsatzsteuerabrechnung. Liest Ein- und Aus
 ## Tech-Stack
 
 - **DB:** MS SQL Server (`ERPDEV26S` für Entwicklung, `s26s5xx_DATAMART` als Sandbox)
-- **Frontend:** Python 3.11+ / Streamlit / pyodbc (Wechsel auf phpRunner bleibt offen)
+- **Frontend:** Python 3.11+ / Streamlit / pymssql (UI) / pyodbc (Deploy-/Analyse-Skripte; Wechsel auf phpRunner bleibt offen)
 - **Tests:** SQL-Skripte gegen Sandbox inkl. Demo-Workflow; pytest-Wrapper geplant
 
 ## Quickstart
@@ -38,8 +38,8 @@ python -m venv .venv
 pip install -r requirements.txt
 
 Copy-Item .env.example .env
-# .env öffnen, Credentials eintragen
-# Die finale Streamlit-App nutzt den APP-Zugang; APP_* Credentials eintragen
+# .env öffnen, Ziel-DB prüfen und persönliche DEV-/SANDBOX-Credentials eintragen
+# Die Streamlit-App fragt den DB-User beim Start im Login ab.
 ```
 
 ### 3. Sandbox-DB vorbereiten
@@ -56,7 +56,7 @@ python scripts\deploy_sandbox.py
 streamlit run app\main.py
 ```
 
-Die finale App nutzt den vorgesehenen APP-Zugang auf `ERPDEV26S` direkt. Sandbox- und Dev-Connection-Helfer bleiben für Deploy-/Analyse-Skripte vorhanden, sind aber nicht die Laufzeitbasis der UI.
+Die App nutzt `ERPDEV26S` als Zielsystem und meldet den Benutzer beim Start mit dessen echtem DB-Zugang an. Sandbox- und Dev-Connection-Helfer bleiben für Deploy-/Analyse-Skripte vorhanden, sind aber nicht die Laufzeitbasis der UI.
 
 ### 5. Demo-Workflow prüfen
 

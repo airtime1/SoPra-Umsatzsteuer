@@ -1,6 +1,6 @@
 -- ============================================================
 -- stored_proc.sp_G15_pay_vat_statement
--- APPROVED -> PAID. Aufrufer: Leitung FiBu (Stufe 2).
+-- APPROVED -> PAID. Aufrufer: mindestens Leitung FiBu-Level (Stufe 2).
 -- Stellt PAID dar als "ausgezahlt / Vorgang abgeschlossen".
 -- ------------------------------------------------------------
 -- Transitionspruefung ueber die zentrale Architekten-Function
@@ -29,6 +29,15 @@ BEGIN
         RETURN;
     END
 
+    DECLARE @current_db_user VARCHAR(50) = CAST(SUSER_SNAME() AS VARCHAR(50));
+    IF @paid_by IS NOT NULL AND @paid_by <> @current_db_user
+    BEGIN
+        THROW 50024, 'Benutzerparameter stimmt nicht mit dem aktuellen DB-Login ueberein.', 1;
+        RETURN;
+    END
+    SET @paid_by = @current_db_user;
+
+    -- Hierarchische Rollenpruefung ueber SECURITY_LEVEL der Transition
     DECLARE @required_security_level INT = (
         SELECT SECURITY_LEVEL FROM dbo.T_CODE_NEXT
         WHERE CODE_ID = @old_id AND CODE_NEXT_ID = @new_id
@@ -41,7 +50,7 @@ BEGIN
         RETURN;
     END
 
-    IF @required_security_level IS NULL OR @actual_security_level <> @required_security_level
+    IF @required_security_level IS NULL OR @actual_security_level < @required_security_level
     BEGIN
         THROW 50021, 'Benutzer hat nicht die benoetigte Rolle fuer diese Aktion.', 1;
         RETURN;

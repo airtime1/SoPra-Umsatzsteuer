@@ -26,8 +26,8 @@ Gemäß ADR-008 berechnet G15 keine Steuerbeträge. Wir konsumieren TAX_AMOUNT d
 - `list_views.V_LIST_G15_OUTPUT_VAT` — eine Quelle: G7 (`V_LIST_G07_INVOICE` über `T_INVOICE`); G9 (Bar Rosenberg) und G10 (Bar Freiburg) laufen über dieselbe Tabelle mit (Beschluss 2026-06-16). Aktuell liefert G7s View nur Fernabsatz, B2C-Erweiterung ist G7s Bring-Schuld.
 - `list_views.V_LIST_G15_VAT_SKONTO` — finaler Steuerbetrag je Rechnung aus G8; überschreibt in `sp_G15_create_vat_statement` den Rechnungsbetrag bei Skonto (ADR-010, aktuell Stub).
 - `list_views.V_LIST_G15_INPUT_VAT` — G4 (Lieferantenrechnungen); aktiv auf `V_LIST_SUPPLIER_INVOICE` (`TOTAL_VAT_AMOUNT`), liefert 0 Zeilen bis G4 Daten einspielt.
-- `list_views.V_LIST_G15_VAT_STATEMENT`, `list_views.V_LIST_G15_VAT_STATEMENT_ITEM` und `list_views.V_LIST_G15_VAT_USER` kapseln die eigenen Tabellen für die Streamlit-App.
-- `dbo.fn_get_user_securitylevel` liest `T_USER.SECURITYLEVEL`; die Status-Procedures prüfen erlaubte Übergänge über `T_CODE_NEXT.SECURITY_LEVEL`.
+- `list_views.V_LIST_G15_VAT_STATEMENT` und `list_views.V_LIST_G15_VAT_STATEMENT_ITEM` kapseln die eigenen Tabellen für die Streamlit-App. `list_views.V_LIST_G15_VAT_USER` bleibt ein optionales User-/Rollen-View-Artefakt, ist in ERPDEV26S aber nicht Laufzeitvoraussetzung.
+- `dbo.fn_get_user_securitylevel` liest `T_USER.SECURITYLEVEL`; die UI nutzt sie nach DB-Login mit `SUSER_SNAME()`, und die Status-Procedures prüfen erlaubte Übergänge hierarchisch über den Mindest-Level aus `T_CODE_NEXT.SECURITY_LEVEL`.
 
 Stubs liefern Spalten mit korrekter Signatur, aber 0 Zeilen (`WHERE 1 = 0`). Aktivierung = auskommentierten Block in der View durch echten SELECT austauschen, siehe Kommentare in den View-Dateien.
 

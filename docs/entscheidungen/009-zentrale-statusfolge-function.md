@@ -36,12 +36,13 @@ Uebergangspruefung zuvor mit einem eigenen 3-fach-JOIN ueber `T_CODE` /
 
 3. **Die Rollenpruefung bleibt eigene Logik.** `fn_chk_status_folge`
    prueft keine Rollen. Wir lesen `SECURITY_LEVEL` weiterhin direkt aus
-   `T_CODE_NEXT` und vergleichen mit `dbo.fn_get_user_securitylevel`.
+   `T_CODE_NEXT` und pruefen hierarchisch gegen `dbo.fn_get_user_securitylevel`
+   (`actual_level >= required_level`, siehe ADR-011).
 
 4. **`sp_G15_create_vat_statement` bleibt unveraendert.** Das Anlegen eines
    neuen DRAFT ist kein Uebergang in `T_CODE_NEXT` (es gibt keinen
-   Von-Status). Die Rollenpruefung dort bleibt fest auf Stufe 1
-   (Sachbearbeiter).
+   Von-Status). Die Rollenpruefung dort bleibt auf Mindest-Stufe 1
+   (Sachbearbeitung), hoehere Level duerfen die Aktion ebenfalls.
 
 ## Konsequenzen
 
@@ -63,5 +64,5 @@ Negativ / Risiken:
 
 ## Verbindung zu anderen ADRs
 
-- ADR-001 (Statusmodell) und ADR-002 (Rollen) bleiben unveraendert.
+- ADR-001 (Statusmodell) bleibt unveraendert; ADR-002 (Rollen) wird durch ADR-011 hierarchisch ergaenzt.
 - Ergaenzt die Umsetzung, nicht die fachliche Entscheidung.

@@ -98,13 +98,15 @@ Statusmodell:
 
 Erlaubte Statusfolgen (in `dbo.T_CODE_NEXT` hinterlegt):
 
-- `DRAFT -> APPROVED`: CFO, `SECURITYLEVEL=3`.
-- `APPROVED -> DRAFT`: CFO, `SECURITYLEVEL=3`, fachliche Rueckgabe.
-- `APPROVED -> PAID`: Leitung FiBu, `SECURITYLEVEL=2`.
+- `DRAFT -> APPROVED`: Mindest-Level 3 (CFO).
+- `APPROVED -> DRAFT`: Mindest-Level 3 (CFO), fachliche Rueckgabe.
+- `APPROVED -> PAID`: Mindest-Level 2 (Leitung FiBu).
 
-Die Anlage einer Abrechnung ist Sachbearbeiter-Aufgabe (`SECURITYLEVEL=1`).
+Die Anlage einer Abrechnung ist eine Level-1-Aktion (`SECURITYLEVEL >= 1`).
 
-Die Status-Procedures pruefen die **Gueltigkeit** eines Uebergangs ueber die zentrale Architekten-Function `dbo.fn_chk_status_folge` (liest `dbo.T_CODE_NEXT`, ADR-009) und die **Rolle** ueber `dbo.T_USER.SECURITYLEVEL` gegen den `SECURITY_LEVEL` der Transition. `T_CODE_NEXT` ist dabei die Konfiguration (welche Uebergaenge, welche Rolle), die Procedure fuehrt den eigentlichen Statuswechsel plus Audit-Felder aus. Die UI bietet nur passende Benutzer aus `list_views.V_LIST_G15_VAT_USER` an, ersetzt aber keine echte Authentifizierung.
+Die Status-Procedures pruefen die **Gueltigkeit** eines Uebergangs ueber die zentrale Architekten-Function `dbo.fn_chk_status_folge` (liest `dbo.T_CODE_NEXT`, ADR-009) und die **Rolle** hierarchisch ueber `dbo.T_USER.SECURITYLEVEL` gegen den Mindest-`SECURITY_LEVEL` der Transition (`actual_level >= required_level`, ADR-011). `T_CODE_NEXT` ist dabei die Konfiguration (welche Uebergaenge, welcher Mindest-Level), die Procedure fuehrt den eigentlichen Statuswechsel plus Audit-Felder aus. Uebergebene Audit-User muessen dem aktuellen `SUSER_SNAME()` entsprechen, damit direkte Procedure-Aufrufe keinen fremden User vortaeuschen koennen. Die UI nutzt denselben Mindest-Level fuer sichtbare Aktionen.
+
+Die App hat keine manuelle Rollensimulation mehr. Der Benutzer meldet sich mit seinem echten DB-Zugang an; die UI ermittelt den Login via `SUSER_SNAME()` und den Level via `dbo.fn_get_user_securitylevel(SUSER_SNAME())`. Audit-Spalten verwenden diesen echten DB-User.
 
 ## Integration
 
@@ -113,7 +115,7 @@ Die App pflegt keine eigenen Kopien fremder Rechnungsdaten. Partnerdaten werden 
 - Umsatzsteuer: `list_views.V_LIST_G07_INVOICE` (G7, aktiv; liefert alle Ausgangsrechnungen, sobald die View B2C einschliesst).
 - Vorsteuer: G4-View `list_views.V_LIST_SUPPLIER_INVOICE` (aktiv seit 23.06., `TOTAL_VAT_AMOUNT`; 0 Zeilen bis G4 Daten einspielt).
 - Skonto: `list_views.V_LIST_G08_PAYMENT_RECEIPT` (G8; Skonto-Flag `SKONTO_BERECHTIGT_YN` da, Stub bis finaler Steuerbetrag nach Skonto geliefert wird).
-- Status, Rollen, zentrale Bausteine: `dbo.T_CODE`, `dbo.T_CODE_NEXT`, `dbo.T_USER`, `dbo.fn_chk_status_folge`.
+- Status, Rollen, zentrale Bausteine: `dbo.T_CODE`, `dbo.T_CODE_NEXT`, `dbo.T_USER`, `dbo.fn_chk_status_folge`, `dbo.fn_get_user_securitylevel`.
 
 Wenn eine Partnergruppe ihre Schnittstelle aendert, wird primaer die eigene `list_views.V_LIST_*`-View (bzw. der Stub-Block) angepasst. Stored Procedures, App-Services und Tests bleiben dadurch stabil.
 
@@ -124,4 +126,4 @@ Wenn eine Partnergruppe ihre Schnittstelle aendert, wird primaer die eigene `lis
 - Keine Rechnungserstellung oder Rechnungskorrektur in vorgelagerten Modulen.
 - Keine eigene Steuerberechnung aus Roh-Belegen (ADR-008).
 - Keine fachliche Steuerberatung und keine produktionsreife Compliance-Software.
-- Keine echte Authentifizierung im Streamlit-Prototyp; die DB-Rollenpruefung bildet den fachlichen Workflow fuer die Demo ab.
+- Keine produktionsreife Web-Session-Verwaltung; Streamlit haelt die eingegebenen DB-Credentials nur im laufenden Session-State.
