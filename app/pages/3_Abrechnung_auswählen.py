@@ -55,6 +55,44 @@ def format_statement_option(statement_id: int) -> str:
     )
 
 
+@st.dialog("Skonto-Hinweis vor der Freigabe")
+def skonto_approval_dialog(statement_id: int, username: str) -> None:
+    st.write("Skonto wird in dieser Anwendung nicht automatisch berücksichtigt.")
+    st.write(
+        "Bitte prüfen Sie vor der Freigabe, ob zu dieser Abrechnungsperiode "
+        "Skonto, Zahlungsdifferenzen oder nachträgliche Korrekturen vorliegen. "
+        "Falls erforderlich, müssen diese manuell in der Abrechnung berücksichtigt werden."
+    )
+    st.write("Mit der Freigabe bestätigen Sie, dass die Skonto-Prüfung erfolgt ist.")
+
+    confirmation_key = f"skonto_approval_confirmed_{statement_id}"
+    confirmed = st.checkbox(
+        "Ich habe geprüft, ob Skonto oder Zahlungsdifferenzen manuell zu berücksichtigen sind.",
+        key=confirmation_key,
+    )
+
+    cancel_col, approve_col = st.columns(2)
+    with cancel_col:
+        if st.button("Abbrechen", use_container_width=True):
+            st.session_state.pop(confirmation_key, None)
+            st.rerun()
+    with approve_col:
+        if st.button(
+            "Abrechnung freigeben",
+            type="primary",
+            use_container_width=True,
+            disabled=not confirmed,
+        ):
+            try:
+                vat.approve_statement(statement_id, username)
+            except Exception as exc:
+                st.error(ui.friendly_error_message(exc))
+            else:
+                st.session_state.pop(confirmation_key, None)
+                st.session_state["flash_success"] = "Abrechnung wurde freigegeben."
+                st.rerun()
+
+
 with st.container(border=True):
     ui.card_title("Abrechnung auswählen", "folder")
     query_statement_id = st.query_params.get("statement_id")
@@ -145,12 +183,7 @@ with st.container(border=True):
                             ui.show_error_dialog("Neuberechnung fehlgeschlagen", exc)
 
                     if action == "approve" and st.button("Freigeben", type="primary", use_container_width=True):
-                        try:
-                            vat.approve_statement(selected_id, user.username)
-                            st.session_state["flash_success"] = "Abrechnung wurde freigegeben."
-                            st.rerun()
-                        except Exception as exc:
-                            ui.show_error_dialog("Freigabe fehlgeschlagen", exc)
+                        skonto_approval_dialog(selected_id, user.username)
 
                     if action == "reject" and st.button("Zurückweisen", use_container_width=True):
                         try:

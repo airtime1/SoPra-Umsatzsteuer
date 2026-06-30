@@ -40,7 +40,7 @@ Die Zahlungseingangsgruppe wird nur relevant, wenn eine Rechnung **mit Skonto** 
 - Wird Skonto beansprucht, mindert sich der zu versteuernde Betrag um den Skonto-Anteil. Der urspruenglich gebuchte USt-Betrag stimmt dann nicht mehr.
 - Gruppe 8 liefert je Zahlungseingang den **finalen** Steuerbetrag der Rechnung nach Skonto plus `IS_SKONTO` (Y/N). Bei `IS_SKONTO='Y'` ueberschreibt `sp_G15_create_vat_statement` den urspruenglichen Steuerbetrag der Rechnung (Match ueber `INVOICE_ID`, ADR-010).
 
-Wir rechnen den Steueranteil **nicht** selbst aus einem Brutto-Differenzbetrag — das ist Gruppe 8s Aufgabe (ADR-008). Skonto-Korrekturen kommen ausschliesslich aus G8.
+Wir rechnen den Steueranteil **nicht** selbst aus einem Brutto-Differenzbetrag — das ist Gruppe 8s Aufgabe (ADR-008). Skonto-Korrekturen kommen ausschliesslich aus G8. Solange G8 den finalen Steuerbetrag nach Skonto nicht vollstaendig liefert, bleibt die automatische Skonto-Beruecksichtigung deaktiviert; die App verlangt unmittelbar vor der Freigabe (`DRAFT -> APPROVED`) eine aktive Bestaetigung, dass Skonto, Zahlungsdifferenzen und nachtraegliche Korrekturen manuell geprueft wurden.
 
 ## Periodenlogik
 
@@ -76,7 +76,7 @@ Die beiden Item-Views liefern eine stabile Spalten-Signatur (`SOURCE_TABLE`, `SO
 
 ### Stub-Pattern fuer noch nicht gelieferte Quellen
 
-Solange eine Partner-View oder ein Partner-Feld fehlt, laeuft die zugehoerige Quelle als **Stub**: korrekte Spalten-Signatur, aber `WHERE 1 = 0` (null Zeilen). Der echte Aktivierungs-SELECT steht im View-File als Kommentar bereit und wird ohne weitere Aenderung eingesetzt, sobald die Partner-Gruppe liefert. Stand 2026-06-23: G7 aktiv (nur Fernabsatz, B2C-Erweiterung offen); `V_LIST_G15_INPUT_VAT` (G4) aktiv auf `V_LIST_SUPPLIER_INVOICE` (0 Zeilen bis G4 Daten einspielt); `V_LIST_G15_VAT_SKONTO` (G8) weiterhin Stub, weil der finale Steuerbetrag nach Skonto fehlt (siehe `docs/schnittstellen_annahmen.md`).
+Solange eine Partner-View oder ein Partner-Feld fehlt, laeuft die zugehoerige Quelle als **Stub**: korrekte Spalten-Signatur, aber `WHERE 1 = 0` (null Zeilen). Der echte Aktivierungs-SELECT steht im View-File als Kommentar bereit und wird ohne weitere Aenderung eingesetzt, sobald die Partner-Gruppe liefert. Stand 2026-06-23: G7 aktiv (nur Fernabsatz, B2C-Erweiterung offen); `V_LIST_G15_INPUT_VAT` (G4) aktiv auf `V_LIST_SUPPLIER_INVOICE` (0 Zeilen bis G4 Daten einspielt); `V_LIST_G15_VAT_SKONTO` (G8) weiterhin Stub, weil der finale Steuerbetrag nach Skonto fehlt. Bis zur Lieferung des finalen G8-Steuerbetrags wird die Skonto-Pruefung beim Freigeben manuell bestaetigt (siehe `docs/schnittstellen_annahmen.md`).
 
 ## Korrekturen, Skonto und Storno
 

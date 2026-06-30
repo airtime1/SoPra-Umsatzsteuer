@@ -35,7 +35,10 @@ rechnungen erscheinen — bis dahin zaehlt nur Fernabsatz.
 **Skonto (Beschluss 2026-06-16, ADR-010):** G8 liefert je Zahlungseingang
 den *finalen* Steuerbetrag der Rechnung nach Skonto plus `IS_SKONTO` (Y/N),
 keinen separaten Korrekturbetrag mehr. Wir ueberschreiben damit den
-urspruenglichen `TAX_AMOUNT` der Rechnung (Match ueber `INVOICE_ID`).
+urspruenglichen `TAX_AMOUNT` der Rechnung (Match ueber `INVOICE_ID`). Bis G8
+den finalen Steuerbetrag vollstaendig liefert, bleibt die automatische Skonto-
+Beruecksichtigung deaktiviert; die App verlangt vor der Freigabe eine manuelle
+Bestaetigung der Skonto- und Zahlungsdifferenzpruefung.
 
 ## Aktueller Lieferstand der Partner (Diagnose 2026-06-23 gegen ERPDEV26S)
 
@@ -44,7 +47,7 @@ urspruenglichen `TAX_AMOUNT` der Rechnung (Match ueber `INVOICE_ID`).
 | G7 | View deployed, Spalten deutsch (`BetragUstEUR`, `RechnungsDatum`). Liefert aktuell nur Fernabsatz (INNER-JOIN-Kette), 83 von 161 G9-Rechnungen sichtbar. | AKTIV in `V_LIST_G15_OUTPUT_VAT`. Mapping deutsch -> englisch im SELECT. B2C noch nicht enthalten. |
 | G9 / G10 | B2C-Views vorhanden, sollen aber ueber `V_LIST_G07_INVOICE` mitlaufen. | Keine eigene Quelle mehr; abhaengig von G7-View-Erweiterung. |
 | G4 | View `V_LIST_SUPPLIER_INVOICE` seit 23.06. deployed (UPPER_SNAKE, mit `TOTAL_VAT_AMOUNT`), aber noch 0 Datenzeilen. | AKTIV in `V_LIST_G15_INPUT_VAT` (`TOTAL_VAT_AMOUNT -> TAX_AMOUNT`). Liefert Zeilen, sobald G4 Daten einspielt. |
-| G8 | View deployed (`V_LIST_G08_PAYMENT_RECEIPT`); Skonto-Flag `SKONTO_BERECHTIGT_YN` seit 23.06. da, finaler Steuerbetrag nach Skonto fehlt noch. | STUB in `V_LIST_G15_VAT_SKONTO`. Aktivierung erst, wenn finaler Steuerbetrag geliefert wird. |
+| G8 | View deployed (`V_LIST_G08_PAYMENT_RECEIPT`); Skonto-Flag `SKONTO_BERECHTIGT_YN` seit 23.06. da, finaler Steuerbetrag nach Skonto fehlt noch. | STUB in `V_LIST_G15_VAT_SKONTO`. Aktivierung erst, wenn finaler Steuerbetrag geliefert wird. Bis dahin muss die Skonto-/Zahlungsdifferenzpruefung vor der Freigabe manuell bestaetigt werden. |
 
 ## Eigene Konsumenten-Views
 
@@ -99,7 +102,10 @@ Block durch den im Kommentar bereitgestellten echten SELECT ersetzt.
 - **G8** hat in `V_LIST_G08_PAYMENT_RECEIPT` seit 23.06. das Skonto-Flag
   `SKONTO_BERECHTIGT_YN` (Y/N), aber noch keinen finalen Steuerbetrag nach
   Skonto. G8 muss diesen finalen Steuerbetrag je Zahlungseingang (Match ueber
-  `INVOICE_ID`) ergaenzen, damit `V_LIST_G15_VAT_SKONTO` aktiviert werden kann (ADR-010).
+  `INVOICE_ID`) ergaenzen, damit `V_LIST_G15_VAT_SKONTO` aktiviert werden kann
+  (ADR-010). Bis dahin weist die App unmittelbar vor `DRAFT -> APPROVED` auf
+  die manuelle Skonto-/Zahlungsdifferenzpruefung hin und laesst die Freigabe
+  erst nach aktiver Bestaetigung zu.
 - **Architekt** (Lehmann) muss
   `MS5_G15_ARCHITEKT_dbo.sql` ausfuehren: T_CODE-Eintraege fuer VAT_STATUS,
   T_CODE_NEXT-Eintraege fuer die Uebergaenge und die Tabellen
